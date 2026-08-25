@@ -12,7 +12,8 @@ import type { VideoProject } from "@/lib/types";
 import { SubtitleLayer } from "./layers/SubtitleLayer";
 import { BrollLayer } from "./layers/BrollLayer";
 import { ConceptCardLayer } from "./layers/ConceptCardLayer";
-import { IntroLayer } from "./layers/IntroLayer";
+import { HookLayer } from "./layers/HookLayer";
+import { CtaLayer } from "./layers/CtaLayer";
 import { LogoLayer } from "./layers/LogoLayer";
 import { OutroLayer } from "./layers/OutroLayer";
 
@@ -213,6 +214,30 @@ export function UniversalTemplate({ project }: Props) {
       {/* Logo */}
       <LogoLayer brand={project.brand} />
 
+      {/* Hook (behind subtitles so text stays visible) */}
+      {project.introText && (
+        <Sequence
+          from={0}
+          durationInFrames={Math.round((project.introDuration ?? 3) * fps)}
+        >
+          <HookLayer
+            text={project.introText}
+            brand={project.brand}
+            style={project.hookStyle ?? "overlay"}
+          />
+        </Sequence>
+      )}
+
+      {/* CTA before outro */}
+      {project.ctaObjective && (
+        <Sequence
+          from={Math.round(Math.max(0, outroStart - 3) * fps)}
+          durationInFrames={Math.round(3 * fps)}
+        >
+          <CtaLayer objective={project.ctaObjective} brand={project.brand} />
+        </Sequence>
+      )}
+
       {/* Subtitles */}
       <SubtitleLayer
         subtitles={project.subtitles}
@@ -221,16 +246,6 @@ export function UniversalTemplate({ project }: Props) {
         hideAfter={project.outroVideoUrl ? outroStart + 0.5 : undefined}
         currentTime={sourceTime}
       />
-
-      {/* Intro */}
-      {project.introText && (
-        <Sequence
-          from={0}
-          durationInFrames={Math.round(project.introDuration * fps)}
-        >
-          <IntroLayer text={project.introText} brand={project.brand} />
-        </Sequence>
-      )}
 
       {/* Background music */}
       {project.bgMusicUrl && (

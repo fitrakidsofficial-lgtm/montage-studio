@@ -167,6 +167,13 @@ export interface VideoProject {
   /** Background music */
   bgMusicUrl: string | null;
   bgMusicVolume: number;
+  /** Transcription language */
+  language: "auto" | "fr" | "ar" | "en";
+  /** Hook style */
+  hookStyle: "overlay" | "card";
+  /** CTA objective */
+  ctaObjective:
+    "engagement" | "save" | "share" | "subscribe" | "traffic" | "sale" | null;
 }
 
 export interface ZoomKeyframe {
@@ -203,5 +210,8 @@ export function createDefaultProject(): VideoProject {
     captions: null,
     bgMusicUrl: null,
     bgMusicVolume: 0.15,
+    language: "auto",
+    hookStyle: "overlay",
+    ctaObjective: null,
   };
 }
