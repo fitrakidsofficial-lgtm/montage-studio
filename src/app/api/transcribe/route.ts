@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
 
-// Allow large video uploads (up to 500MB)
-export const config = {
-  api: { bodyParser: false },
-};
 export const maxDuration = 120;
 import { writeFile, unlink, readFile } from "fs/promises";
 import { execFile } from "child_process";
