@@ -20,6 +20,7 @@ export async function POST(req: Request) {
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
+  const language = (formData.get("language") as string | null) ?? undefined;
   if (!file) {
     return NextResponse.json({ error: "Pas de fichier" }, { status: 400 });
   }
@@ -62,6 +63,9 @@ export async function POST(req: Request) {
     whisperForm.append("response_format", "verbose_json");
     whisperForm.append("timestamp_granularities[]", "word");
     whisperForm.append("timestamp_granularities[]", "segment");
+    if (language) {
+      whisperForm.append("language", language);
+    }
 
     const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",

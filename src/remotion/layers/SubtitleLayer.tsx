@@ -88,8 +88,9 @@ export function SubtitleLayer({
 
   const arabic = isArabic(active.text);
 
+  const maxWordsPerLine = arabic ? 5 : 7;
   const lines: (typeof mapped)[] = [];
-  if (mapped.length <= 7) {
+  if (mapped.length <= maxWordsPerLine) {
     lines.push(mapped);
   } else {
     const mid = Math.ceil(mapped.length / 2);
@@ -100,11 +101,12 @@ export function SubtitleLayer({
     <div
       style={{
         position: "absolute",
-        left: 30,
-        right: 30,
+        left: arabic ? 50 : 30,
+        right: arabic ? 50 : 30,
         bottom: 120,
+        overflow: "visible",
         fontFamily: arabic ? brand.fonts.arabic : brand.fonts.body,
-        fontSize: arabic ? 82 : mapped.length > 14 ? 62 : 72,
+        fontSize: arabic ? 78 : mapped.length > 14 ? 62 : 72,
         fontWeight: arabic ? 700 : 400,
         lineHeight: arabic ? 1.6 : 1.35,
         textAlign: "center",

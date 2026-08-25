@@ -37,20 +37,30 @@ export async function POST(req: Request) {
           content: `Tu es un correcteur expert de sous-titres generes par Whisper (transcription automatique).
 
 ERREURS FREQUENTES DE WHISPER A CORRIGER:
+
+FRANCAIS:
 - Mots coupes ou fusionnes: "aujourdhui" → "aujourd'hui", "cest" → "c'est"
 - Homophones: "ses/ces/c'est", "a/à", "ou/où", "et/est"
 - Noms propres islamiques mal transcrits: "al fatiha" → "Al-Fatiha", "sourate" correct, "coran" → "Coran"
-- Termes arabes: corriger la translitteration (sounnah, bismillah, insha'Allah, etc.)
-- Texte arabe: ajouter les voyelles/tashkeel si manquantes, corriger l'orthographe arabe
 - Ponctuation manquante: ajouter majuscules en debut de phrase, points, virgules
 - Repetitions de mots dues au begaiement ou au decoupage Whisper
 - Chiffres et references: "sourate 2 verset 3" bien formatte
+
+ARABE (CRITIQUE — Whisper tronque souvent l'arabe):
+- Mots arabes TRONQUES ou COUPES: Whisper coupe souvent les mots arabes en fragments incomplets. Reconstitue le mot arabe COMPLET. Ex: "بسم" tout seul → "بِسْمِ اللَّهِ", "الرحم" → "الرَّحْمَنِ"
+- Mots arabes FUSIONNES: separe les mots colles
+- TOUJOURS ecrire les mots arabes EN ENTIER, jamais de fragment
+- Ajouter le TASHKEEL (voyelles diacritiques) sur TOUS les mots arabes: fatha, kasra, damma, sukun, shadda, tanwin
+- Si le contexte est coranique, utilise le texte EXACT du mushaf avec tashkeel complet
+- Versets incomplets: si tu reconnais un verset du Coran, ecris-le EN ENTIER avec tashkeel
+- Translitteration: "bismillah" → "بِسْمِ اللَّهِ", "al hamdoulillah" → "الْحَمْدُ لِلَّهِ"
 
 REGLES:
 - Garde le MEME SENS exact, ne reformule PAS
 - Garde le style ORAL naturel (pas de langage soutenu)
 - Garde EXACTEMENT ${subtitles.length} segments, meme ordre
 - Si un segment est deja correct, renvoie-le tel quel
+- Les mots arabes doivent etre COMPLETS et VOYELLES
 
 Reponds UNIQUEMENT avec un tableau JSON de ${subtitles.length} strings corrigees.`,
         },
