@@ -10,6 +10,7 @@ import type { BrollItem } from "@/lib/types";
 
 interface Props {
   brolls: BrollItem[];
+  currentTime?: number;
 }
 
 function fade(time: number, start: number, end: number, edge = 0.3) {
@@ -25,10 +26,10 @@ function fade(time: number, start: number, end: number, edge = 0.3) {
   );
 }
 
-export function BrollLayer({ brolls }: Props) {
+export function BrollLayer({ brolls, currentTime }: Props) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const time = frame / fps;
+  const time = currentTime ?? frame / fps;
 
   const active = brolls.find((b) => time >= b.startTime && time < b.endTime);
   if (!active) return null;

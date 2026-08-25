@@ -155,6 +155,30 @@ export interface VideoProject {
   /** Outro video */
   outroVideoUrl: string | null;
   outroDurationSeconds: number;
+  /** Auto-zoom keyframes */
+  zooms: ZoomKeyframe[];
+  /** Silence cuts (jump cuts) */
+  silenceCuts: { start: number; end: number }[];
+  /** Intro card */
+  introText: string | null;
+  introDuration: number;
+  /** Social captions */
+  captions: SocialCaptions | null;
+  /** Background music */
+  bgMusicUrl: string | null;
+  bgMusicVolume: number;
+}
+
+export interface ZoomKeyframe {
+  time: number;
+  scale: number;
+  duration: number;
+}
+
+export interface SocialCaptions {
+  youtube: { title: string; description: string; hashtags: string[] };
+  instagram: { caption: string; hashtags: string[] };
+  tiktok: { caption: string; hashtags: string[] };
 }
 
 export function createDefaultProject(): VideoProject {
@@ -172,5 +196,12 @@ export function createDefaultProject(): VideoProject {
     brolls: [],
     outroVideoUrl: "/outro-reel.MP4",
     outroDurationSeconds: 9,
+    zooms: [],
+    silenceCuts: [],
+    introText: null,
+    introDuration: 3,
+    captions: null,
+    bgMusicUrl: null,
+    bgMusicVolume: 0.15,
   };
 }

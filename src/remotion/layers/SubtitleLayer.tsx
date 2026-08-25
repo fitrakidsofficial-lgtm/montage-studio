@@ -6,6 +6,7 @@ interface Props {
   words: SubtitleWord[];
   brand: BrandConfig;
   hideAfter?: number;
+  currentTime?: number;
 }
 
 /** Returns true if the string contains Arabic/Hebrew script characters */
@@ -42,10 +43,16 @@ function mapWordsToSegment(
   });
 }
 
-export function SubtitleLayer({ subtitles, words, brand, hideAfter }: Props) {
+export function SubtitleLayer({
+  subtitles,
+  words,
+  brand,
+  hideAfter,
+  currentTime,
+}: Props) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const time = frame / fps;
+  const time = currentTime ?? frame / fps;
 
   if (hideAfter !== undefined && time >= hideAfter) return null;
   if (subtitles.length === 0) return null;

@@ -21,6 +21,7 @@ interface Props {
   cards: ConceptCard[];
   brand: BrandConfig;
   style?: "educatif" | "promo" | "broll";
+  currentTime?: number;
 }
 
 function fade(time: number, start: number, end: number, edge = 0.3) {
@@ -582,10 +583,15 @@ function renderCardContent(
   }
 }
 
-export function ConceptCardLayer({ cards, brand, style = "educatif" }: Props) {
+export function ConceptCardLayer({
+  cards,
+  brand,
+  style = "educatif",
+  currentTime,
+}: Props) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const time = frame / fps;
+  const time = currentTime ?? frame / fps;
 
   const active = cards.find((c) => time >= c.startTime && time < c.endTime);
   if (!active) return null;

@@ -27,6 +27,10 @@ export function Editor({ initialProject }: Props) {
   const [searchingBrolls, setSearchingBrolls] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [renderUrl, setRenderUrl] = useState<string | null>(null);
+  const [autoPilot, setAutoPilot] = useState(false);
+  const [autoPilotStep, setAutoPilotStep] = useState("");
+  const [showCaptions, setShowCaptions] = useState(false);
+  const [zoomIntensity, setZoomIntensity] = useState(1.15);
   const [brollSuggestions, setBrollSuggestions] = useState<
     {
       keyword: string;
@@ -63,12 +67,23 @@ export function Editor({ initialProject }: Props) {
     });
   }, []);
 
+  const cutTotal = useMemo(
+    () =>
+      (project.silenceCuts ?? []).reduce(
+        (sum, c) => sum + (c.end - c.start),
+        0,
+      ),
+    [project.silenceCuts],
+  );
+
   const totalDuration = useMemo(
     () =>
-      project.mainVideoDurationSeconds +
+      project.mainVideoDurationSeconds -
+      cutTotal +
       (project.outroVideoUrl ? project.outroDurationSeconds : 0),
     [
       project.mainVideoDurationSeconds,
+      cutTotal,
       project.outroDurationSeconds,
       project.outroVideoUrl,
     ],
@@ -252,6 +267,264 @@ export function Editor({ initialProject }: Props) {
     }
   }, [project]);
 
+  // ── Detect silence cuts from word timestamps ──
+  const detectSilenceCuts = useCallback(
+    (words: { start: number; end: number }[]) => {
+      const cuts: { start: number; end: number }[] = [];
+      for (let i = 1; i < words.length; i++) {
+        const gap = words[i].start - words[i - 1].end;
+        if (gap > 1.5) {
+          cuts.push({
+            start: words[i - 1].end + 0.2,
+            end: words[i].start - 0.2,
+          });
+        }
+      }
+      return cuts;
+    },
+    [],
+  );
+
+  // ── Detect zoom keyframes from emphasis words ──
+  const detectZooms = useCallback(
+    (
+      subtitles: { start: number; end: number; text: string }[],
+      duration: number,
+    ) => {
+      if (zoomIntensity <= 1) return [];
+      const zooms: { time: number; scale: number; duration: number }[] = [];
+      const targets = [0.25, 0.5, 0.75];
+      targets.forEach((ratio) => {
+        const targetTime = ratio * duration;
+        const closest = subtitles.reduce((best, seg) => {
+          const dist = Math.abs(seg.start - targetTime);
+          const bestDist = Math.abs(best.start - targetTime);
+          return dist < bestDist ? seg : best;
+        }, subtitles[0]);
+        if (closest) {
+          zooms.push({
+            time: closest.start,
+            scale: zoomIntensity,
+            duration: Math.min(closest.end - closest.start, 3),
+          });
+        }
+      });
+      return zooms;
+    },
+    [zoomIntensity],
+  );
+
+  // ── Generate intro text from transcript ──
+  const generateIntro = useCallback(
+    async (transcript: string): Promise<string | null> => {
+      try {
+        const res = await fetch("/api/fill-cards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transcript,
+            templateId: "intro",
+            cardTypes: [{ index: 0, type: "custom-text" }],
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.cards?.[0]?.lines?.[0]?.text) {
+          return data.cards[0].lines[0].text;
+        }
+      } catch {}
+      return null;
+    },
+    [],
+  );
+
+  // ── Generate social captions ──
+  const generateCaptions = useCallback(
+    async (transcript: string, style: string) => {
+      try {
+        const res = await fetch("/api/generate-caption", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript, style }),
+        });
+        const data = await res.json();
+        if (res.ok && data.youtube) {
+          return data;
+        }
+      } catch {}
+      return null;
+    },
+    [],
+  );
+
+  // ── AUTO-PILOTE: everything in one click ──
+  const handleAutoPilot = useCallback(async () => {
+    const file = audioFileRef.current || videoFileRef.current;
+    if (!file) {
+      alert("Uploade ta video d'abord");
+      return;
+    }
+
+    setAutoPilot(true);
+
+    try {
+      // Step 1: Transcribe
+      setAutoPilotStep("Transcription Whisper...");
+      const form = new FormData();
+      form.append("file", file, file.name);
+      const transcRes = await fetch("/api/transcribe", {
+        method: "POST",
+        body: form,
+      });
+      const transcData = await transcRes.json();
+      if (!transcRes.ok) throw new Error(transcData.error);
+      update({ subtitles: transcData.subtitles, words: transcData.words });
+
+      // Step 2: Fix subtitles
+      setAutoPilotStep("Correction des sous-titres...");
+      const fixRes = await fetch("/api/fix-subtitles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subtitles: transcData.subtitles,
+          words: transcData.words,
+        }),
+      });
+      const fixData = await fixRes.json();
+      if (fixRes.ok) {
+        update({ subtitles: fixData.subtitles, words: fixData.words });
+      }
+
+      const finalSubs = fixRes.ok ? fixData.subtitles : transcData.subtitles;
+      const finalWords = fixRes.ok ? fixData.words : transcData.words;
+      const transcript = finalSubs
+        .map((s: { text: string }) => s.text)
+        .join(" ");
+
+      // Step 3: Detect best template
+      setAutoPilotStep("Detection du template...");
+      const detectRes = await fetch("/api/auto-detect-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript }),
+      });
+      const detectData = await detectRes.json();
+      const templateId = detectData.templateId || "broll-simple";
+      const preset = TEMPLATE_PRESETS.find((p) => p.id === templateId);
+
+      if (preset) {
+        const cards = applyPreset(preset, project.mainVideoDurationSeconds);
+        setSelectedPresetId(preset.id);
+        update({ style: preset.style, cards });
+
+        // Step 4: Fill cards with AI
+        if (preset.cardSlots.length > 0 && transcript.trim()) {
+          setAutoPilotStep("Remplissage des cards...");
+          const cardTypes = preset.cardSlots.map((slot, i) => ({
+            index: i,
+            type: slot.type,
+          }));
+          const fillRes = await fetch("/api/fill-cards", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              transcript,
+              templateId: preset.id,
+              cardTypes,
+            }),
+          });
+          const fillData = await fillRes.json();
+          if (fillRes.ok && Array.isArray(fillData.cards)) {
+            const filled = cards.map((card, i) => {
+              const aiContent = fillData.cards[i];
+              if (!aiContent) return card;
+              return { ...card, content: { ...card.content, ...aiContent } };
+            });
+            update({ cards: filled });
+          }
+        }
+      }
+
+      // Step 5: Detect silence cuts
+      setAutoPilotStep("Detection des silences...");
+      const silenceCuts = detectSilenceCuts(finalWords);
+      update({ silenceCuts });
+
+      // Step 6: Auto-zoom
+      setAutoPilotStep("Ajout des zooms...");
+      const zooms = detectZooms(finalSubs, project.mainVideoDurationSeconds);
+      update({ zooms });
+
+      // Step 7: Suggest B-rolls
+      setAutoPilotStep("Recherche de B-rolls...");
+      try {
+        const brollRes = await fetch("/api/suggest-brolls", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subtitles: finalSubs,
+            duration: project.mainVideoDurationSeconds,
+          }),
+        });
+        const brollData = await brollRes.json();
+        if (brollRes.ok && brollData.suggestions) {
+          setBrollSuggestions(brollData.suggestions);
+          // Auto-add first image of each suggestion
+          const autoBrolls = brollData.suggestions
+            .filter((s: { images: { url: string }[] }) => s.images.length > 0)
+            .map(
+              (s: {
+                startTime: number;
+                endTime: number;
+                images: { url: string }[];
+              }) => ({
+                id: crypto.randomUUID(),
+                startTime: s.startTime,
+                endTime: s.endTime,
+                fileUrl: s.images[0].url,
+                mediaType: "image" as const,
+              }),
+            );
+          if (autoBrolls.length > 0) {
+            update({ brolls: autoBrolls });
+          }
+        }
+      } catch {}
+
+      // Step 8: Generate captions
+      setAutoPilotStep("Generation des descriptions...");
+      const captions = await generateCaptions(
+        transcript,
+        preset?.style || "educatif",
+      );
+      if (captions) {
+        update({ captions });
+      }
+
+      // Step 9: Generate intro
+      setAutoPilotStep("Generation de l'intro...");
+      const introText = await generateIntro(transcript);
+      if (introText) {
+        update({ introText, introDuration: 3 });
+      }
+
+      setAutoPilotStep("Montage termine !");
+    } catch (err) {
+      alert("Erreur auto-pilote: " + (err as Error).message);
+    } finally {
+      setTimeout(() => {
+        setAutoPilot(false);
+        setAutoPilotStep("");
+      }, 2000);
+    }
+  }, [
+    project.mainVideoDurationSeconds,
+    update,
+    detectSilenceCuts,
+    detectZooms,
+    generateCaptions,
+    generateIntro,
+  ]);
+
   // ── Step 2: Upload subtitles JSON ──
   const handleJsonDrop = useCallback(
     (file: File) => {
@@ -392,6 +665,27 @@ export function Editor({ initialProject }: Props) {
                 </div>
               </button>
             </div>
+
+            {/* Auto-pilote */}
+            {hasVideo && !hasSubs && !autoPilot && (
+              <button
+                onClick={handleAutoPilot}
+                className="mt-3 w-full bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 text-white rounded-xl px-4 py-4 text-sm font-bold transition-all shadow-lg shadow-amber-900/30"
+              >
+                Montage auto (tout-en-un)
+              </button>
+            )}
+            {autoPilot && (
+              <div className="mt-3 rounded-xl border-2 border-amber-500 bg-amber-900/20 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse" />
+                  <div className="text-sm text-amber-300 font-bold">
+                    Auto-pilote en cours
+                  </div>
+                </div>
+                <div className="text-xs text-amber-200/70">{autoPilotStep}</div>
+              </div>
+            )}
 
             {/* Subtitle zone */}
             {hasSubs ? (
@@ -712,6 +1006,177 @@ export function Editor({ initialProject }: Props) {
             )}
           </div>
 
+          {/* ── STEP 5: Captions (depliable) ── */}
+          {project.captions && (
+            <div className="p-4 border-b border-zinc-800">
+              <button
+                onClick={() => setShowCaptions(!showCaptions)}
+                className="w-full flex items-center justify-between"
+              >
+                <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider">
+                  5. Descriptions et hashtags
+                </div>
+                <span className="text-zinc-500 text-sm">
+                  {showCaptions ? "v" : ">"}
+                </span>
+              </button>
+              {showCaptions && (
+                <div className="mt-3 space-y-3">
+                  {/* YouTube */}
+                  <div className="bg-zinc-800/50 rounded-lg p-3">
+                    <div className="text-[10px] text-red-400 font-bold mb-1">
+                      YouTube Shorts
+                    </div>
+                    <div className="text-xs text-white font-bold mb-1">
+                      {project.captions.youtube.title}
+                    </div>
+                    <div className="text-[11px] text-zinc-400 mb-1">
+                      {project.captions.youtube.description}
+                    </div>
+                    <div className="text-[10px] text-zinc-500">
+                      {project.captions.youtube.hashtags.join(" ")}
+                    </div>
+                  </div>
+                  {/* Instagram */}
+                  <div className="bg-zinc-800/50 rounded-lg p-3">
+                    <div className="text-[10px] text-pink-400 font-bold mb-1">
+                      Instagram Reels
+                    </div>
+                    <div className="text-[11px] text-zinc-300 mb-1">
+                      {project.captions.instagram.caption}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 break-all">
+                      {project.captions.instagram.hashtags.join(" ")}
+                    </div>
+                  </div>
+                  {/* TikTok */}
+                  <div className="bg-zinc-800/50 rounded-lg p-3">
+                    <div className="text-[10px] text-cyan-400 font-bold mb-1">
+                      TikTok
+                    </div>
+                    <div className="text-[11px] text-zinc-300 mb-1">
+                      {project.captions.tiktok.caption}
+                    </div>
+                    <div className="text-[10px] text-zinc-500">
+                      {project.captions.tiktok.hashtags.join(" ")}
+                    </div>
+                  </div>
+                  {/* Copy buttons */}
+                  <div className="flex gap-2">
+                    {(["youtube", "instagram", "tiktok"] as const).map(
+                      (platform) => (
+                        <button
+                          key={platform}
+                          onClick={() => {
+                            const c = project.captions!;
+                            const text =
+                              platform === "youtube"
+                                ? `${c.youtube.title}\n\n${c.youtube.description}\n\n${c.youtube.hashtags.join(" ")}`
+                                : platform === "instagram"
+                                  ? `${c.instagram.caption}\n\n${c.instagram.hashtags.join(" ")}`
+                                  : `${c.tiktok.caption} ${c.tiktok.hashtags.join(" ")}`;
+                            navigator.clipboard.writeText(text);
+                          }}
+                          className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg px-2 py-1.5 text-[10px] font-bold transition-colors"
+                        >
+                          Copier {platform}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Zoom intensity ── */}
+          <div className="px-4 pt-4 pb-2">
+            <label className="text-xs text-zinc-400 block mb-1">
+              Intensite du zoom
+            </label>
+            <div className="flex items-center gap-2">
+              {[
+                { label: "Aucun", value: 1 },
+                { label: "1.1x", value: 1.1 },
+                { label: "1.15x", value: 1.15 },
+                { label: "1.2x", value: 1.2 },
+                { label: "1.3x", value: 1.3 },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setZoomIntensity(opt.value);
+                    if ((project.zooms ?? []).length > 0) {
+                      update({
+                        zooms: (project.zooms ?? []).map((z) => ({
+                          ...z,
+                          scale: opt.value,
+                        })),
+                      });
+                    }
+                  }}
+                  className={`px-2 py-1 rounded text-xs transition-colors ${
+                    zoomIntensity === opt.value
+                      ? "bg-teal-600 text-white"
+                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Background music ── */}
+          <div className="px-4 pt-2 pb-2 space-y-2">
+            <label className="text-xs text-zinc-400 block">
+              Musique de fond
+            </label>
+            <div className="flex items-center gap-2">
+              <label className="flex-1 flex items-center gap-2 px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 cursor-pointer text-xs text-zinc-300 transition-colors">
+                <span>{project.bgMusicUrl ? "Changer" : "Ajouter un MP3"}</span>
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      const url = URL.createObjectURL(f);
+                      update({ bgMusicUrl: url });
+                    }
+                  }}
+                />
+              </label>
+              {project.bgMusicUrl && (
+                <button
+                  onClick={() => update({ bgMusicUrl: null })}
+                  className="px-2 py-2 rounded bg-red-900/40 text-red-400 text-xs hover:bg-red-900/60"
+                >
+                  Retirer
+                </button>
+              )}
+            </div>
+            {project.bgMusicUrl && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-500 w-16">
+                  Vol: {Math.round((project.bgMusicVolume ?? 0.15) * 100)}%
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.5}
+                  step={0.01}
+                  value={project.bgMusicVolume ?? 0.15}
+                  onChange={(e) =>
+                    update({ bgMusicVolume: parseFloat(e.target.value) })
+                  }
+                  className="flex-1 accent-teal-500"
+                />
+              </div>
+            )}
+          </div>
+
           {/* ── Status bar ── */}
           <div className="p-4 text-xs text-zinc-600 space-y-1">
             <div>
@@ -719,7 +1184,9 @@ export function Editor({ initialProject }: Props) {
               - {project.style}
             </div>
             <div>
-              Logo: {project.brand.logoUrl ? "OK" : "-"} | Outro:{" "}
+              Zooms: {(project.zooms ?? []).length} | Coupures:{" "}
+              {(project.silenceCuts ?? []).length} | Logo:{" "}
+              {project.brand.logoUrl ? "OK" : "-"} | Outro:{" "}
               {project.outroVideoUrl ? "OK" : "-"}
             </div>
           </div>
