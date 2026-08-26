@@ -1,16 +1,42 @@
 "use client";
 
-import { useMemo } from "react";
-import { Player } from "@remotion/player";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
+import { Player, type PlayerRef } from "@remotion/player";
 import { UniversalTemplate } from "@/remotion/UniversalTemplate";
 import type { VideoProject } from "@/lib/types";
 
 interface Props {
   project: VideoProject;
   totalDuration: number;
+  onTimeUpdate?: (timeSeconds: number, frame: number) => void;
+  onPlayingChange?: (playing: boolean) => void;
 }
 
-export default function PlayerPreview({ project, totalDuration }: Props) {
+export interface PlayerHandle {
+  seekTo: (timeSeconds: number) => void;
+  getCurrentFrame: () => number;
+  isPlaying: () => boolean;
+  toggle: () => void;
+  captureFrame: () => string | null;
+}
+
+const PlayerPreview = forwardRef<PlayerHandle, Props>(function PlayerPreview(
+  { project, totalDuration, onTimeUpdate, onPlayingChange },
+  ref,
+) {
+  const playerRef = useRef<PlayerRef>(null);
+  const playingRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [playerSize, setPlayerSize] = useState({ w: 360, h: 640 });
+
   const durationInFrames = Math.max(
     Math.round(totalDuration * project.fps),
     project.fps,
@@ -39,9 +65,106 @@ export default function PlayerPreview({ project, totalDuration }: Props) {
     ],
   );
 
+  // Expose imperative handle for parent
+  useImperativeHandle(
+    ref,
+    () => ({
+      seekTo: (timeSeconds: number) => {
+        const frame = Math.round(timeSeconds * project.fps);
+        playerRef.current?.seekTo(frame);
+      },
+      getCurrentFrame: () => {
+        return playerRef.current?.getCurrentFrame() ?? 0;
+      },
+      isPlaying: () => playingRef.current,
+      toggle: () => {
+        if (playingRef.current) {
+          playerRef.current?.pause();
+        } else {
+          playerRef.current?.play();
+        }
+      },
+      captureFrame: () => {
+        const container = playerRef.current?.getContainerNode();
+        if (!container) return null;
+        const canvas = container.querySelector("canvas");
+        if (canvas) return canvas.toDataURL("image/jpeg", 0.7);
+        // Fallback: try to capture from video element
+        const video = container.querySelector("video");
+        if (!video) return null;
+        const c = document.createElement("canvas");
+        c.width = 360;
+        c.height = 640;
+        const ctx = c.getContext("2d");
+        if (!ctx) return null;
+        ctx.drawImage(video, 0, 0, 360, 640);
+        return c.toDataURL("image/jpeg", 0.7);
+      },
+    }),
+    [project.fps],
+  );
+
+  // Sync time updates from Remotion Player to parent
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onTimeUpdateRef.current = onTimeUpdate;
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  onPlayingChangeRef.current = onPlayingChange;
+
+  const handleTimeUpdate = useCallback(
+    (e: { detail: { frame: number } }) => {
+      const frame = e.detail.frame;
+      const time = frame / project.fps;
+      onTimeUpdateRef.current?.(time, frame);
+    },
+    [project.fps],
+  );
+
+  const handlePlay = useCallback(() => {
+    playingRef.current = true;
+    onPlayingChangeRef.current?.(true);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    playingRef.current = false;
+    onPlayingChangeRef.current?.(false);
+  }, []);
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    player.addEventListener("timeupdate", handleTimeUpdate);
+    player.addEventListener("play", handlePlay);
+    player.addEventListener("pause", handlePause);
+
+    return () => {
+      player.removeEventListener("timeupdate", handleTimeUpdate);
+      player.removeEventListener("play", handlePlay);
+      player.removeEventListener("pause", handlePause);
+    };
+  }, [playerKey, handleTimeUpdate, handlePlay, handlePause]);
+
+  // Responsive sizing: fill container height with 9:16 ratio
+  useEffect(() => {
+    const el = containerRef.current?.parentElement;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const availH = el.clientHeight - 32; // padding
+      const h = Math.max(400, Math.min(availH, 900));
+      const w = Math.round(h * (9 / 16));
+      setPlayerSize({ w, h });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/50">
+    <div
+      ref={containerRef}
+      className="rounded-2xl overflow-hidden shadow-2xl shadow-black/50"
+    >
       <Player
+        ref={playerRef}
         key={playerKey}
         component={UniversalTemplate}
         inputProps={{ project }}
@@ -49,11 +172,13 @@ export default function PlayerPreview({ project, totalDuration }: Props) {
         compositionWidth={1080}
         compositionHeight={1920}
         fps={project.fps}
-        style={{ width: 360, height: 640 }}
+        style={{ width: playerSize.w, height: playerSize.h }}
         controls
         loop
         autoPlay={false}
       />
     </div>
   );
-}
+});
+
+export default PlayerPreview;

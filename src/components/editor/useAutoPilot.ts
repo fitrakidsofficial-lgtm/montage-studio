@@ -42,6 +42,8 @@ export function useAutoPilot(
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const videoFileRef = useRef<File | null>(null);
   const audioFileRef = useRef<File | null>(null);
+  const bgMusicFileRef = useRef<File | null>(null);
+  const brollFilesRef = useRef<Map<string, File>>(new Map());
 
   const detectSilenceCuts = useCallback(
     (words: { start: number; end: number }[]) => {
@@ -234,6 +236,9 @@ export function useAutoPilot(
           // Convert director decisions to project data
           const zooms: { time: number; scale: number; duration: number }[] = [];
           const silenceCuts: { start: number; end: number }[] = [];
+          const texteCles: { time: number; duration: number; text: string }[] =
+            [];
+          const patternInterrupts: { time: number; duration: number }[] = [];
           const brollKeywords: {
             keyword: string;
             startTime: number;
@@ -264,10 +269,25 @@ export function useAutoPilot(
                   });
                 }
                 break;
+              case "texte-cle":
+                if (d.text) {
+                  texteCles.push({
+                    time: d.time,
+                    duration: d.duration,
+                    text: d.text,
+                  });
+                }
+                break;
+              case "pattern-interrupt":
+                patternInterrupts.push({
+                  time: d.time,
+                  duration: d.duration,
+                });
+                break;
             }
           }
 
-          update({ zooms, silenceCuts });
+          update({ zooms, silenceCuts, texteCles, patternInterrupts });
 
           // Step 6: Search B-rolls using Director keywords + Pexels
           if (brollKeywords.length > 0) {
@@ -400,6 +420,8 @@ export function useAutoPilot(
     setSelectedPresetId,
     videoFileRef,
     audioFileRef,
+    bgMusicFileRef,
+    brollFilesRef,
     handleAutoPilot,
     handlePreset,
   };

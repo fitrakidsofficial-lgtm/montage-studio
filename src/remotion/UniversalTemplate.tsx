@@ -16,6 +16,8 @@ import { HookLayer } from "./layers/HookLayer";
 import { CtaLayer } from "./layers/CtaLayer";
 import { LogoLayer } from "./layers/LogoLayer";
 import { OutroLayer } from "./layers/OutroLayer";
+import { TexteCleLayer } from "./layers/TexteCleLayer";
+import { PatternInterruptLayer } from "./layers/PatternInterruptLayer";
 
 /**
  * Remap output time → source time by skipping silence cuts.
@@ -200,8 +202,21 @@ export function UniversalTemplate({ project }: Props) {
         }}
       />
 
-      {/* B-roll layer */}
-      <BrollLayer brolls={project.brolls} currentTime={sourceTime} />
+      {/* B-roll layer — pass context for auto layout */}
+      <BrollLayer
+        brolls={project.brolls}
+        currentTime={sourceTime}
+        hasSubtitle={project.subtitles.some(
+          (s) => sourceTime >= s.start && sourceTime < s.end,
+        )}
+        hasTexteCle={(project.texteCles ?? []).some(
+          (t) => sourceTime >= t.time && sourceTime < t.time + t.duration,
+        )}
+        hasOverlay={
+          (!!project.introText && sourceTime <= (project.introDuration ?? 3)) ||
+          (!!project.ctaObjective && sourceTime >= contentEnd - 3)
+        }
+      />
 
       {/* Concept cards */}
       <ConceptCardLayer
@@ -238,6 +253,19 @@ export function UniversalTemplate({ project }: Props) {
         </Sequence>
       )}
 
+      {/* Texte-cle overlays (Director) */}
+      <TexteCleLayer
+        texteCles={project.texteCles ?? []}
+        brand={project.brand}
+        currentTime={sourceTime}
+      />
+
+      {/* Pattern interrupts (Director) */}
+      <PatternInterruptLayer
+        interrupts={project.patternInterrupts ?? []}
+        currentTime={sourceTime}
+      />
+
       {/* Subtitles */}
       <SubtitleLayer
         subtitles={project.subtitles}
@@ -245,6 +273,8 @@ export function UniversalTemplate({ project }: Props) {
         brand={project.brand}
         hideAfter={project.outroVideoUrl ? outroStart + 0.5 : undefined}
         currentTime={sourceTime}
+        fontSize={project.subtitleFontSize || undefined}
+        fontFamily={project.subtitleFontFamily || undefined}
       />
 
       {/* Background music */}

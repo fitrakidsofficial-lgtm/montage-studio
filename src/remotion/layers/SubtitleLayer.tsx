@@ -7,6 +7,10 @@ interface Props {
   brand: BrandConfig;
   hideAfter?: number;
   currentTime?: number;
+  /** Custom font size override (default: 72, arabic: 78) */
+  fontSize?: number;
+  /** Custom font family override */
+  fontFamily?: string;
 }
 
 /** Returns true if the string contains Arabic/Hebrew script characters */
@@ -49,6 +53,8 @@ export function SubtitleLayer({
   brand,
   hideAfter,
   currentTime,
+  fontSize: fontSizeOverride,
+  fontFamily: fontFamilyOverride,
 }: Props) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -105,8 +111,11 @@ export function SubtitleLayer({
         right: arabic ? 50 : 30,
         bottom: 120,
         overflow: "visible",
-        fontFamily: arabic ? brand.fonts.arabic : brand.fonts.body,
-        fontSize: arabic ? 78 : mapped.length > 14 ? 62 : 72,
+        fontFamily:
+          fontFamilyOverride ||
+          (arabic ? brand.fonts.arabic : brand.fonts.body),
+        fontSize:
+          fontSizeOverride || (arabic ? 78 : mapped.length > 14 ? 62 : 72),
         fontWeight: arabic ? 700 : 400,
         lineHeight: arabic ? 1.6 : 1.35,
         textAlign: "center",

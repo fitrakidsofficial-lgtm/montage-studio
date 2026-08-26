@@ -1,14 +1,25 @@
 "use client";
 
-import { useCallback } from "react";
-import type { BrollItem } from "@/lib/types";
+import { useCallback, type MutableRefObject } from "react";
+import type { BrollItem, BrollLayout } from "@/lib/types";
+
+const LAYOUT_OPTIONS: { value: BrollLayout; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "fullscreen", label: "Plein ecran" },
+  { value: "bottom-half", label: "Bas" },
+  { value: "top-half", label: "Haut" },
+  { value: "overlay", label: "Overlay" },
+  { value: "picture-in-picture", label: "PIP" },
+  { value: "centered-card", label: "Carte" },
+];
 
 interface Props {
   brolls: BrollItem[];
   onChange: (brolls: BrollItem[]) => void;
+  brollFilesRef?: MutableRefObject<Map<string, File>>;
 }
 
-export function BrollGallery({ brolls, onChange }: Props) {
+export function BrollGallery({ brolls, onChange, brollFilesRef }: Props) {
   const handleFiles = useCallback(
     (files: FileList) => {
       const newBrolls: BrollItem[] = [];
@@ -16,8 +27,12 @@ export function BrollGallery({ brolls, onChange }: Props) {
         const file = files[i];
         const url = URL.createObjectURL(file);
         const isVideo = file.type.startsWith("video/");
+        const id = crypto.randomUUID();
+        if (brollFilesRef) {
+          brollFilesRef.current.set(id, file);
+        }
         newBrolls.push({
-          id: crypto.randomUUID(),
+          id,
           startTime: 0,
           endTime: 3,
           fileUrl: url,
@@ -26,7 +41,7 @@ export function BrollGallery({ brolls, onChange }: Props) {
       }
       onChange([...brolls, ...newBrolls]);
     },
-    [brolls, onChange],
+    [brolls, onChange, brollFilesRef],
   );
 
   const handleDrop = useCallback(
@@ -129,6 +144,22 @@ export function BrollGallery({ brolls, onChange }: Props) {
               <div className="text-xs text-zinc-500">
                 {b.mediaType === "video" ? "Video" : "Image"} -{" "}
                 {(b.endTime - b.startTime).toFixed(1)}s
+              </div>
+              {/* Layout selector */}
+              <div className="flex flex-wrap gap-1 mt-1">
+                {LAYOUT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => updateBroll(b.id, { layout: opt.value })}
+                    className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
+                      (b.layout ?? "auto") === opt.value
+                        ? "bg-amber-700/60 text-amber-200"
+                        : "bg-zinc-700/40 text-zinc-500 hover:text-zinc-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
 

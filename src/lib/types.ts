@@ -128,12 +128,25 @@ export interface CustomTextContent {
   }[];
 }
 
+export type BrollLayout =
+  | "auto"
+  | "fullscreen"
+  | "bottom-half"
+  | "top-half"
+  | "overlay"
+  | "picture-in-picture"
+  | "centered-card";
+
 export interface BrollItem {
   id: string;
   startTime: number;
   endTime: number;
   fileUrl: string;
   mediaType: "image" | "video";
+  /** Visual layout — "auto" lets the engine choose based on context */
+  layout?: BrollLayout;
+  /** Orientation hint for auto layout */
+  orientation?: "portrait" | "landscape";
 }
 
 export interface VideoProject {
@@ -159,6 +172,10 @@ export interface VideoProject {
   zooms: ZoomKeyframe[];
   /** Silence cuts (jump cuts) */
   silenceCuts: { start: number; end: number }[];
+  /** Director: texte-cle overlays */
+  texteCles: { time: number; duration: number; text: string }[];
+  /** Director: pattern interrupts */
+  patternInterrupts: { time: number; duration: number }[];
   /** Intro card */
   introText: string | null;
   introDuration: number;
@@ -169,6 +186,9 @@ export interface VideoProject {
   bgMusicVolume: number;
   /** Transcription language */
   language: "auto" | "fr" | "ar" | "en";
+  /** Subtitle styling */
+  subtitleFontSize: number;
+  subtitleFontFamily: string;
   /** Hook style */
   hookStyle: "overlay" | "card";
   /** CTA objective */
@@ -205,12 +225,16 @@ export function createDefaultProject(): VideoProject {
     outroDurationSeconds: 9,
     zooms: [],
     silenceCuts: [],
+    texteCles: [],
+    patternInterrupts: [],
     introText: null,
     introDuration: 3,
     captions: null,
     bgMusicUrl: null,
     bgMusicVolume: 0.15,
     language: "auto",
+    subtitleFontSize: 72,
+    subtitleFontFamily: "",
     hookStyle: "overlay",
     ctaObjective: null,
   };

@@ -1,5 +1,6 @@
 "use client";
 
+import type { MutableRefObject } from "react";
 import type { VideoProject } from "@/lib/types";
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   update: (patch: Partial<VideoProject>) => void;
   zoomIntensity: number;
   setZoomIntensity: (v: number) => void;
+  bgMusicFileRef: MutableRefObject<File | null>;
 }
 
 export function StepSettings({
@@ -14,6 +16,7 @@ export function StepSettings({
   update,
   zoomIntensity,
   setZoomIntensity,
+  bgMusicFileRef,
 }: Props) {
   return (
     <>
@@ -68,6 +71,7 @@ export function StepSettings({
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) {
+                  bgMusicFileRef.current = f;
                   const url = URL.createObjectURL(f);
                   update({ bgMusicUrl: url });
                 }
