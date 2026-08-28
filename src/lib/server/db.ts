@@ -4,7 +4,7 @@ let client: ReturnType<typeof postgres> | undefined;
 let schemaPromise: Promise<void> | undefined;
 
 export function db() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL manquante");
   }
@@ -13,7 +13,7 @@ export function db() {
     idle_timeout: 20,
     connect_timeout: 15,
     prepare: false,
-    ssl: "require",
+    ssl: connectionString.includes("sslmode=") ? undefined : "require",
   });
   return client;
 }
