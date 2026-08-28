@@ -25,6 +25,7 @@ export async function POST(req: Request) {
     history,
     visualIntent,
     frameImage,
+    userImages,
     resolvedTarget,
     elementVersions,
   } = await req.json();
@@ -250,16 +251,28 @@ Reponds UNIQUEMENT avec du JSON valide.`;
         text?: string;
         image_url?: { url: string; detail: string };
       }[];
+  // Collect all extra user images
+  const extraImageParts: {
+    type: string;
+    image_url: { url: string; detail: string };
+  }[] = (userImages ?? []).map((img: string) => ({
+    type: "image_url" as const,
+    image_url: { url: img, detail: "low" as const },
+  }));
+
   if (visualIntent && frameImage) {
+    const hasUserAttachments =
+      extraImageParts.length > 0 || (userImages && userImages.length > 0);
     userContent = [
       {
         type: "text" as const,
-        text: `${message}\n\n[FRAME au playhead — analyse le rendu visuel]`,
+        text: `${message}\n\n[${hasUserAttachments ? "Photos jointes par l'utilisateur" : "FRAME au playhead"} — analyse le rendu visuel]`,
       },
       {
         type: "image_url" as const,
         image_url: { url: frameImage, detail: "low" as const },
       },
+      ...extraImageParts,
     ];
   } else if (visualIntent && !frameImage) {
     userContent = `${message}\n\n[Demande visuelle mais capture impossible. Base-toi sur les metadonnees. Ne fais aucune affirmation visuelle. Si necessaire, demande a l'utilisateur de decrire.]`;

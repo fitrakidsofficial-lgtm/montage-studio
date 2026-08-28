@@ -12,10 +12,17 @@ interface ActionResult {
   error?: string;
 }
 
+interface AttachedImage {
+  id: string;
+  dataUrl: string;
+  name: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  images?: AttachedImage[];
   actions?: AgentAction[];
   applied?: boolean;
   actionResults?: ActionResult[];
@@ -234,7 +241,12 @@ function needsVisualContext(text: string): boolean {
 }
 
 type AgentState =
-  "idle" | "thinking" | "analyzing-frame" | "applying" | "confirmed" | "failed";
+  | "idle"
+  | "thinking"
+  | "analyzing-frame"
+  | "applying"
+  | "confirmed"
+  | "failed";
 
 const AGENT_STATE_LABELS: Record<AgentState, string> = {
   idle: "",
@@ -328,8 +340,10 @@ export function AgentPanel({
     },
   ]);
   const [input, setInput] = useState("");
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const elementHistoryRef = useRef<ElementHistory>(new Map());
 
@@ -340,21 +354,74 @@ export function AgentPanel({
     });
   }, [messages]);
 
+  const handleImageAttach = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
+      Array.from(files).forEach((file) => {
+        if (!file.type.startsWith("image/")) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          setAttachedImages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              dataUrl: reader.result as string,
+              name: file.name,
+            },
+          ]);
+        };
+        reader.readAsDataURL(file);
+      });
+      e.target.value = "";
+    },
+    [],
+  );
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+        const reader = new FileReader();
+        reader.onload = () => {
+          setAttachedImages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              dataUrl: reader.result as string,
+              name: "screenshot.png",
+            },
+          ]);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }, []);
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text && attachedImages.length === 0) return;
+    if (loading) return;
 
+    const currentImages = [...attachedImages];
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      content: text,
+      content: text || "(image jointe)",
+      images: currentImages.length > 0 ? currentImages : undefined,
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setAttachedImages([]);
     setLoading(true);
 
-    // Capture frame for visual intent BEFORE setting state
-    const isVisual = needsVisualContext(text);
+    // Images attached by user force visual context
+    const hasUserImages = currentImages.length > 0;
+    const isVisual = hasUserImages || needsVisualContext(text);
     setAgentState(isVisual ? "analyzing-frame" : "thinking");
 
     // Build rich editor context at send time
@@ -366,15 +433,17 @@ export function AgentPanel({
       selectedElement,
     );
 
-    // Capture frame only for visual intent — graceful null on CORS/failure
+    // Capture frame for visual intent — graceful null on CORS/failure
     let frameDataUrl: string | null = null;
-    if (isVisual) {
+    if (isVisual && !hasUserImages) {
       try {
         frameDataUrl = captureFrame();
       } catch {
         frameDataUrl = null;
       }
     }
+    // User-attached images take priority
+    const userImageDataUrls = currentImages.map((img) => img.dataUrl);
 
     try {
       const res = await fetch("/api/agent-edit", {
@@ -386,7 +455,15 @@ export function AgentPanel({
           resolvedTarget: editorContext.resolvedTarget,
           elementVersions: buildVersionSummary(elementHistoryRef.current),
           visualIntent: isVisual,
-          frameImage: isVisual ? frameDataUrl : undefined,
+          frameImage: hasUserImages
+            ? userImageDataUrls[0]
+            : isVisual
+              ? frameDataUrl
+              : undefined,
+          userImages:
+            userImageDataUrls.length > 1
+              ? userImageDataUrls.slice(1)
+              : undefined,
           project: {
             style: project.style,
             duration: project.mainVideoDurationSeconds,
@@ -573,6 +650,7 @@ export function AgentPanel({
     }
   }, [
     input,
+    attachedImages,
     loading,
     project,
     update,
@@ -809,6 +887,19 @@ export function AgentPanel({
                   : "bg-zinc-800/60 text-zinc-300"
               }`}
             >
+              {/* User-attached images */}
+              {msg.images && msg.images.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {msg.images.map((img) => (
+                    <img
+                      key={img.id}
+                      src={img.dataUrl}
+                      alt={img.name}
+                      className="w-full max-w-[200px] rounded border border-zinc-600/50"
+                    />
+                  ))}
+                </div>
+              )}
               <div className="whitespace-pre-wrap">
                 {msg.role === "assistant"
                   ? renderContent(
@@ -932,19 +1023,72 @@ export function AgentPanel({
 
       {/* Input */}
       <div className="p-2.5 border-t border-zinc-800/50">
+        {/* Attached image previews */}
+        {attachedImages.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {attachedImages.map((img) => (
+              <div key={img.id} className="relative group">
+                <img
+                  src={img.dataUrl}
+                  alt={img.name}
+                  className="w-16 h-16 object-cover rounded border border-zinc-700"
+                />
+                <button
+                  onClick={() =>
+                    setAttachedImages((prev) =>
+                      prev.filter((i) => i.id !== img.id),
+                    )
+                  }
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full text-[9px] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  x
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-1.5 items-end">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleImageAttach}
+          />
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            className="w-11 h-11 shrink-0 bg-zinc-800/60 hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300 rounded-lg transition-colors touch-manipulation flex items-center justify-center"
+            title="Joindre une photo"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </button>
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder="Modifier quoi..."
             rows={1}
             className="flex-1 bg-zinc-800/60 border border-zinc-700/50 rounded-lg px-3 py-2.5 text-sm text-white placeholder-zinc-600 resize-none outline-none focus:border-zinc-600 transition-colors min-h-[44px]"
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || loading}
+            disabled={(!input.trim() && attachedImages.length === 0) || loading}
             className="w-11 h-11 shrink-0 bg-zinc-700 hover:bg-zinc-600 active:bg-zinc-500 disabled:opacity-40 text-white rounded-lg text-sm transition-colors touch-manipulation flex items-center justify-center"
           >
             &rarr;

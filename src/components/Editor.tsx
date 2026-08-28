@@ -1,18 +1,16 @@
 "use client";
 
-import {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  lazy,
-  Suspense,
-} from "react";
+import { useState, useCallback, useRef, lazy, Suspense } from "react";
 import type { VideoProject } from "@/lib/types";
 import { useProjectState } from "./editor/useProjectState";
 import { useAutoPilot } from "./editor/useAutoPilot";
+import {
+  useKeyboardShortcuts,
+  duplicateElement,
+} from "./editor/useKeyboardShortcuts";
 import { Timeline, type SelectedElement } from "./editor/Timeline";
 import { AgentPanel } from "./editor/AgentPanel";
+import { PropertyPanel } from "./editor/PropertyPanel";
 import { ToolbarPanels, type PanelId } from "./editor/ToolbarPanels";
 import type { PlayerHandle } from "./PlayerPreview";
 
@@ -74,6 +72,8 @@ const SHORTCUTS = [
   { key: "\u2190 / \u2192", desc: "Reculer / Avancer 1s" },
   { key: "Shift + \u2190/\u2192", desc: "Reculer / Avancer 5s" },
   { key: "Suppr", desc: "Supprimer selection" },
+  { key: "Cmd+D", desc: "Dupliquer selection" },
+  { key: "S", desc: "Couper au playhead" },
   { key: "F", desc: "Mode Focus" },
   { key: "Echap", desc: "Quitter Focus / Deselectionner" },
   { key: "Ctrl+Z", desc: "Annuler" },
@@ -126,139 +126,56 @@ export function Editor({ initialProject }: Props) {
     [project.fps],
   );
 
-  // Keyboard shortcuts — skip when user is typing in input/textarea
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      const isTyping = tag === "INPUT" || tag === "TEXTAREA";
-
-      // Undo/Redo always work
-      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-        return;
-      }
-      if (
-        (e.metaKey || e.ctrlKey) &&
-        (e.key === "y" || (e.key === "z" && e.shiftKey))
-      ) {
-        e.preventDefault();
-        redo();
-        return;
-      }
-
-      // Editing shortcuts — only when NOT typing
-      if (isTyping) return;
-
-      switch (e.key) {
-        case " ":
-          e.preventDefault();
-          playerHandleRef.current?.toggle();
-          break;
-        case "k":
-        case "K":
-          e.preventDefault();
-          playerHandleRef.current?.toggle();
-          break;
-        case "l":
-        case "L":
-          e.preventDefault();
-          if (!isPlaying) playerHandleRef.current?.toggle();
-          break;
-        case "j":
-        case "J":
-          e.preventDefault();
-          // Step back 2s
-          handleSeek(Math.max(0, currentTime - 2));
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          handleSeek(Math.max(0, currentTime - (e.shiftKey ? 5 : 1)));
-          break;
-        case "ArrowRight":
-          e.preventDefault();
-          handleSeek(
-            Math.min(totalDuration, currentTime + (e.shiftKey ? 5 : 1)),
-          );
-          break;
-        case "Delete":
-        case "Backspace":
-          if (selectedElement) {
-            e.preventDefault();
-            // Delete selected element
-            const sel = selectedElement;
-            if (sel.type === "broll") {
-              update({
-                brolls: project.brolls.filter((b) => b.id !== sel.id),
-              });
-            } else if (sel.type === "card") {
-              update({
-                cards: project.cards.filter((c) => c.id !== sel.id),
-              });
-            } else if (sel.type === "zoom") {
-              const idx = parseInt(sel.id);
-              update({
-                zooms: (project.zooms ?? []).filter((_, i) => i !== idx),
-              });
-            } else if (sel.type === "texteCle") {
-              const idx = parseInt(sel.id);
-              update({
-                texteCles: (project.texteCles ?? []).filter(
-                  (_, i) => i !== idx,
-                ),
-              });
-            } else if (sel.type === "patternInterrupt") {
-              const idx = parseInt(sel.id);
-              update({
-                patternInterrupts: (project.patternInterrupts ?? []).filter(
-                  (_, i) => i !== idx,
-                ),
-              });
-            }
-            setSelectedElement(null);
-          }
-          break;
-        case "Escape":
-          if (showShortcuts) {
-            setShowShortcuts(false);
-          } else if (focusMode) {
-            setFocusMode(false);
-          } else if (selectedElement) {
-            setSelectedElement(null);
-          }
-          break;
-        case "f":
-        case "F":
-          if (!e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            setFocusMode((f) => !f);
-          }
-          break;
-        case "?":
-          e.preventDefault();
-          setShowShortcuts((s) => !s);
-          break;
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [
+  // Keyboard shortcuts (extracted hook with Cmd+D duplicate and S split)
+  useKeyboardShortcuts({
+    project,
+    update,
     undo,
     redo,
     currentTime,
     totalDuration,
     isPlaying,
     selectedElement,
+    setSelectedElement,
     focusMode,
+    setFocusMode,
     showShortcuts,
+    setShowShortcuts,
     handleSeek,
-    update,
-    project.brolls,
-    project.cards,
-    project.zooms,
-    project.texteCles,
-    project.patternInterrupts,
-  ]);
+    playerHandleRef,
+  });
+
+  // ── Handlers for PropertyPanel actions ──
+  const handleDeleteSelected = useCallback(() => {
+    if (!selectedElement) return;
+    const sel = selectedElement;
+    if (sel.type === "broll") {
+      update({ brolls: project.brolls.filter((b) => b.id !== sel.id) });
+    } else if (sel.type === "card") {
+      update({ cards: project.cards.filter((c) => c.id !== sel.id) });
+    } else if (sel.type === "zoom") {
+      const idx = parseInt(sel.id);
+      update({ zooms: (project.zooms ?? []).filter((_, i) => i !== idx) });
+    } else if (sel.type === "texteCle") {
+      const idx = parseInt(sel.id);
+      update({
+        texteCles: (project.texteCles ?? []).filter((_, i) => i !== idx),
+      });
+    } else if (sel.type === "patternInterrupt") {
+      const idx = parseInt(sel.id);
+      update({
+        patternInterrupts: (project.patternInterrupts ?? []).filter(
+          (_, i) => i !== idx,
+        ),
+      });
+    }
+    setSelectedElement(null);
+  }, [selectedElement, project, update]);
+
+  const handleDuplicateSelected = useCallback(() => {
+    if (!selectedElement) return;
+    duplicateElement(project, update, selectedElement, setSelectedElement);
+  }, [selectedElement, project, update]);
 
   const {
     autoPilot,
@@ -807,31 +724,45 @@ export function Editor({ initialProject }: Props) {
           </Suspense>
         </div>
 
-        {/* Right: Agent panel — drawer overlay on tablet, inline on desktop */}
-        {showAgent ? (
+        {/* Right panel: PropertyPanel when element selected, otherwise AgentPanel */}
+        {showAgent || selectedElement ? (
           <>
             {/* Backdrop on mobile */}
             <div
               className="fixed inset-0 bg-black/40 z-30 md:hidden animate-[fadeIn_150ms_ease-out]"
-              onClick={() => setShowAgent(false)}
+              onClick={() => {
+                setShowAgent(false);
+                setSelectedElement(null);
+              }}
             />
             <div className="fixed right-0 top-11 bottom-0 w-80 z-40 animate-[slideInRight_200ms_ease-out] md:animate-none md:relative md:top-auto md:bottom-auto md:z-auto md:w-72 min-w-[260px] max-w-[340px] border-l border-zinc-800/50 bg-zinc-900 md:bg-zinc-900/20 shrink-0 flex flex-col">
-              <AgentPanel
-                project={project}
-                update={update}
-                undo={undo}
-                currentTime={currentTime}
-                currentFrame={currentFrame}
-                isPlaying={isPlaying}
-                selectedElement={selectedElement}
-                onSeek={handleSeek}
-                onSelectElement={setSelectedElement}
-                onHighlight={setHighlightedElement}
-                captureFrame={() =>
-                  playerHandleRef.current?.captureFrame() ?? null
-                }
-                onCollapse={() => setShowAgent(false)}
-              />
+              {selectedElement ? (
+                <PropertyPanel
+                  project={project}
+                  update={update}
+                  selectedElement={selectedElement}
+                  onDeselect={() => setSelectedElement(null)}
+                  onDuplicate={handleDuplicateSelected}
+                  onDelete={handleDeleteSelected}
+                />
+              ) : (
+                <AgentPanel
+                  project={project}
+                  update={update}
+                  undo={undo}
+                  currentTime={currentTime}
+                  currentFrame={currentFrame}
+                  isPlaying={isPlaying}
+                  selectedElement={selectedElement}
+                  onSeek={handleSeek}
+                  onSelectElement={setSelectedElement}
+                  onHighlight={setHighlightedElement}
+                  captureFrame={() =>
+                    playerHandleRef.current?.captureFrame() ?? null
+                  }
+                  onCollapse={() => setShowAgent(false)}
+                />
+              )}
             </div>
           </>
         ) : (
