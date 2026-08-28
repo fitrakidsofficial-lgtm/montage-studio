@@ -568,7 +568,7 @@ export function PropertyPanel({
           <Section title="Jump cut">
             <div className="text-[11px] text-zinc-400">
               Les jump cuts ne sont pas modifiables directement. Utilisez
-              l'agent IA pour les ajuster.
+              l’agent IA pour les ajuster.
             </div>
           </Section>
         )}

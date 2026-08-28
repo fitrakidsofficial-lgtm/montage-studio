@@ -197,7 +197,314 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
     ],
   },
 
+  // ─── ÉNIGMES MISSION SOURATES ───
+  // Format signature : hook → énigme (3 propositions) → tic-tac 5s → reveal → le fond → CTA MISSION
+  {
+    id: "enigme-mot",
+    style: "educatif",
+    name: "① Énigme — Devine le mot",
+    description: "Mot arabe caché, 3 propositions, tic-tac, reveal, CTA MISSION",
+    cardSlots: [
+      {
+        type: "custom-text",
+        startRatio: 0.06,
+        endRatio: 0.24,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "IL RÉCITE CE MOT. IL VEUT DIRE QUOI ?", fontSize: 56, color: "teal" },
+            { text: "1 · ", fontSize: 48, color: "cream" },
+            { text: "2 · ", fontSize: 48, color: "cream" },
+            { text: "3 · ", fontSize: 48, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "single-word",
+        startRatio: 0.26,
+        endRatio: 0.4,
+        content: {
+          type: "single-word",
+          label: "LA RÉPONSE",
+          arabic: "",
+          translation: "",
+        },
+      },
+      {
+        type: "custom-text",
+        startRatio: 0.55,
+        endRatio: 0.7,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "", fontSize: 64, color: "gold" },
+            { text: "", fontSize: 44, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "feature-list",
+        startRatio: 0.72,
+        endRatio: 0.84,
+        content: {
+          type: "feature-list",
+          title: "DANS MISSION SOURATES",
+          features: [
+            "Le livre interactif du contexte",
+            "L'épreuve audio immersive",
+            "Le quiz",
+            "La carte mentale",
+          ],
+        },
+      },
+      {
+        type: "cta",
+        startRatio: 0.87,
+        endRatio: 0.97,
+        content: {
+          type: "cta",
+          mainText: "COMMENTE : MISSION",
+          subText: "8 sourates · quiz gratuit · lien en bio",
+        },
+      },
+    ],
+  },
+  {
+    id: "enigme-histoire",
+    style: "educatif",
+    name: "② Énigme — L'histoire derrière",
+    description: "Récit du contexte : énigme, reveal, verset, leçon, CTA MISSION",
+    cardSlots: [
+      {
+        type: "custom-text",
+        startRatio: 0.06,
+        endRatio: 0.24,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "", fontSize: 56, color: "teal" },
+            { text: "1 · ", fontSize: 48, color: "cream" },
+            { text: "2 · ", fontSize: 48, color: "cream" },
+            { text: "3 · ", fontSize: 48, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "custom-text",
+        startRatio: 0.26,
+        endRatio: 0.34,
+        content: {
+          type: "custom-text",
+          lines: [{ text: "", fontSize: 80, color: "gold" }],
+        },
+      },
+      {
+        type: "verse",
+        startRatio: 0.4,
+        endRatio: 0.55,
+        content: {
+          type: "verse",
+          surahLabel: "",
+          arabic: "",
+          translation: "",
+        },
+      },
+      {
+        type: "custom-text",
+        startRatio: 0.66,
+        endRatio: 0.8,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "", fontSize: 64, color: "orange" },
+            { text: "", fontSize: 44, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "cta",
+        startRatio: 0.87,
+        endRatio: 0.97,
+        content: {
+          type: "cta",
+          mainText: "COMMENTE : MISSION",
+          subText: "8 sourates · quiz gratuit · lien en bio",
+        },
+      },
+    ],
+  },
+  {
+    id: "enigme-lecon",
+    style: "educatif",
+    name: "③ Énigme — Ça change quoi aujourd'hui",
+    description: "Situation du quotidien, le mot du Coran, verset, application, CTA",
+    cardSlots: [
+      {
+        type: "custom-text",
+        startRatio: 0.06,
+        endRatio: 0.24,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "", fontSize: 56, color: "teal" },
+            { text: "1 · ", fontSize: 48, color: "cream" },
+            { text: "2 · ", fontSize: 48, color: "cream" },
+            { text: "3 · ", fontSize: 48, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "single-word",
+        startRatio: 0.26,
+        endRatio: 0.38,
+        content: {
+          type: "single-word",
+          label: "ÇA PORTE UN NOM",
+          arabic: "",
+          translation: "",
+        },
+      },
+      {
+        type: "verse",
+        startRatio: 0.44,
+        endRatio: 0.58,
+        content: {
+          type: "verse",
+          surahLabel: "",
+          arabic: "",
+          translation: "",
+        },
+      },
+      {
+        type: "custom-text",
+        startRatio: 0.66,
+        endRatio: 0.8,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "", fontSize: 64, color: "gold" },
+            { text: "", fontSize: 44, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "cta",
+        startRatio: 0.87,
+        endRatio: 0.97,
+        content: {
+          type: "cta",
+          mainText: "COMMENTE : MISSION",
+          subText: "8 sourates · quiz gratuit · lien en bio",
+        },
+      },
+    ],
+  },
+  {
+    id: "enigme-detail",
+    style: "educatif",
+    name: "④ Énigme — Le détail que personne ne remarque",
+    description: "Série qui parle au parent : énigme, verset, révélation, offre, CTA",
+    cardSlots: [
+      {
+        type: "custom-text",
+        startRatio: 0.05,
+        endRatio: 0.22,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "", fontSize: 56, color: "teal" },
+            { text: "1 · ", fontSize: 48, color: "cream" },
+            { text: "2 · ", fontSize: 48, color: "cream" },
+            { text: "3 · ", fontSize: 48, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "verse",
+        startRatio: 0.28,
+        endRatio: 0.44,
+        content: {
+          type: "verse",
+          surahLabel: "",
+          arabic: "",
+          translation: "",
+        },
+      },
+      {
+        type: "custom-text",
+        startRatio: 0.48,
+        endRatio: 0.62,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "", fontSize: 72, color: "gold" },
+            { text: "", fontSize: 44, color: "cream" },
+          ],
+        },
+      },
+      {
+        type: "feature-list",
+        startRatio: 0.7,
+        endRatio: 0.84,
+        content: {
+          type: "feature-list",
+          title: "DANS MISSION SOURATES",
+          features: [
+            "Le livre interactif du contexte",
+            "L'épreuve audio immersive",
+            "Le quiz",
+            "La carte mentale",
+          ],
+        },
+      },
+      {
+        type: "cta",
+        startRatio: 0.87,
+        endRatio: 0.97,
+        content: {
+          type: "cta",
+          mainText: "COMMENTE : MISSION",
+          subText: "8 sourates · quiz gratuit · lien en bio",
+        },
+      },
+    ],
+  },
+
   // ─── PROMO ───
+  {
+    id: "cta-mission",
+    style: "promo",
+    name: "CTA Mission Sourates",
+    description: "Clip de fin réutilisable : les 4 briques + mot-clé MISSION",
+    cardSlots: [
+      {
+        type: "feature-list",
+        startRatio: 0.1,
+        endRatio: 0.55,
+        content: {
+          type: "feature-list",
+          title: "DANS MISSION SOURATES",
+          features: [
+            "Le livre interactif du contexte",
+            "L'épreuve audio immersive",
+            "Le quiz",
+            "La carte mentale",
+          ],
+        },
+      },
+      {
+        type: "cta",
+        startRatio: 0.6,
+        endRatio: 0.95,
+        content: {
+          type: "cta",
+          mainText: "COMMENTE : MISSION",
+          subText: "8 sourates · une nouvelle chaque mois · quiz gratuit",
+        },
+      },
+    ],
+  },
+
   {
     id: "promo-standard",
     style: "promo",

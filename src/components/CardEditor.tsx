@@ -449,7 +449,7 @@ export function CardEditor({ cards, onChange }: Props) {
 
       {cards.length === 0 && (
         <div className="text-zinc-500 text-sm text-center py-4">
-          Aucune card. Choisis un type et clique "+ Ajouter".
+          Aucune card. Choisis un type et clique « + Ajouter ».
         </div>
       )}
     </div>

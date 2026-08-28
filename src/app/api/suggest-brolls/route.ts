@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getUser } from "@/lib/server/auth";
 
 interface BrollSuggestion {
   keyword: string;
@@ -14,6 +15,9 @@ interface DirectorKeyword {
 }
 
 export async function POST(req: Request) {
+  if (!(await getUser())) {
+    return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
+  }
   const apiKey = process.env.OPENAI_API_KEY;
   const pexelsKey = process.env.PEXELS_API_KEY;
   if (!apiKey) {

@@ -12,7 +12,9 @@
     "@remotion/cli": "^4.0.513",
     "@remotion/player": "^4.0.513",
     "@remotion/renderer": "^4.0.513",
+    "@vercel/blob": "^2.8.0",
     "next": "16.3.1",
+    "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "remotion": "^4.0.513"
@@ -25,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
+    "tsconfig-paths-webpack-plugin": "^4.2.0",
     "typescript": "^5"
   }
 }

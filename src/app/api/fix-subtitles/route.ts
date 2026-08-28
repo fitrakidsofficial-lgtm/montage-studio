@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { getUser } from "@/lib/server/auth";
 
 export async function POST(req: Request) {
+  if (!(await getUser())) {
+    return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
+  }
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

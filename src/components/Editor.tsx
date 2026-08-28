@@ -13,6 +13,7 @@ import { AgentPanel } from "./editor/AgentPanel";
 import { PropertyPanel } from "./editor/PropertyPanel";
 import { ToolbarPanels, type PanelId } from "./editor/ToolbarPanels";
 import type { PlayerHandle } from "./PlayerPreview";
+import { applyEpisode } from "@/lib/mission-sourates-episodes";
 
 const PlayerPreview = lazy(() => import("./PlayerPreview"));
 
@@ -32,6 +33,7 @@ const ICONS: Record<string, string> = {
   brand: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
   audio:
     "M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zM21 16a3 3 0 11-6 0 3 3 0 016 0z",
+  publish: "M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13",
 };
 
 function ToolbarIcon({ id }: { id: string }) {
@@ -62,6 +64,7 @@ const TOOLBAR_ITEMS: { id: Exclude<PanelId, null>; label: string }[] = [
   { id: "brolls", label: "B-rolls" },
   { id: "brand", label: "Marque" },
   { id: "audio", label: "Audio" },
+  { id: "publish", label: "Publier" },
 ];
 
 // Shortcuts reference
@@ -89,6 +92,7 @@ export function Editor({ initialProject }: Props) {
   const [fixingSubs, setFixingSubs] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [renderUrl, setRenderUrl] = useState<string | null>(null);
+  const [renderKind, setRenderKind] = useState<"full" | "trailer">("full");
   const [fillingCards, setFillingCards] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelId>("media");
   const [selectedElement, setSelectedElement] =
@@ -183,12 +187,16 @@ export function Editor({ initialProject }: Props) {
     brollSuggestions,
     setBrollSuggestions,
     selectedPresetId,
+    setSelectedPresetId,
+    templateSuggestions,
+    waitingForTemplate,
     videoFileRef,
     audioFileRef,
     bgMusicFileRef,
     brollFilesRef,
     handleAutoPilot,
     handlePreset,
+    continueWithTemplate,
   } = useAutoPilot(project, update, zoomIntensity);
 
   // ── Upload video ──
@@ -250,9 +258,10 @@ export function Editor({ initialProject }: Props) {
   }, [project.subtitles, project.words, update]);
 
   // ── Export MP4 ──
-  const handleRender = useCallback(async () => {
+  const handleRender = useCallback(async (mode: "full" | "trailer") => {
     setRendering(true);
     setRenderUrl(null);
+    setRenderKind(mode);
     try {
       const form = new FormData();
       const projectCopy = { ...project, brolls: [...project.brolls] };
@@ -286,15 +295,28 @@ export function Editor({ initialProject }: Props) {
       }
 
       form.append("project", JSON.stringify(projectCopy));
+      if (mode === "trailer") {
+        form.append(
+          "clipDurationSeconds",
+          String(project.trailerDurationSeconds ?? 30),
+        );
+      }
       const res = await fetch("/api/render", { method: "POST", body: form });
       const data = await res.json();
-      if (res.ok && data.url) setRenderUrl(data.url);
+      if (res.ok && data.url) {
+        setRenderUrl(data.url);
+        update(
+          mode === "trailer"
+            ? { trailerVideoUrl: data.url }
+            : { fullVideoUrl: data.url },
+        );
+      }
       else alert(data.error || "Erreur de rendu");
     } catch (err) {
       alert("Erreur: " + (err as Error).message);
     }
     setRendering(false);
-  }, [project, videoFileRef, bgMusicFileRef, brollFilesRef]);
+  }, [project, videoFileRef, bgMusicFileRef, brollFilesRef, update]);
 
   // ── Drag & drop video ──
   const handleDrop = useCallback(
@@ -402,7 +424,7 @@ export function Editor({ initialProject }: Props) {
         <div className="text-center max-w-lg">
           <h1 className="text-3xl font-bold text-white mb-1">Montage Studio</h1>
           <p className="text-sm text-zinc-500 mb-6">
-            Importe une video, l'IA s'occupe du montage.
+            Importe une video, l’IA s’occupe du montage.
           </p>
 
           {/* Steps preview */}
@@ -425,7 +447,7 @@ export function Editor({ initialProject }: Props) {
               <div className="w-8 h-8 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-400">
                 3
               </div>
-              <span>Ajuster avec l'IA</span>
+              <span>Ajuster avec l’IA</span>
             </div>
             <div className="flex items-center text-zinc-700 -mt-2">&#8594;</div>
             <div className="flex flex-col items-center gap-1.5">
@@ -617,11 +639,20 @@ export function Editor({ initialProject }: Props) {
 
           {/* Export — always visible but compact on mobile */}
           <button
-            onClick={handleRender}
+            onClick={() => void handleRender("full")}
             disabled={rendering}
             className="hidden md:block px-4 py-1.5 bg-white text-zinc-900 hover:bg-zinc-200 disabled:opacity-40 rounded-lg text-xs font-semibold transition-colors"
           >
             {rendering ? "Rendu..." : "Exporter"}
+          </button>
+          <button
+            onClick={() => void handleRender("trailer")}
+            disabled={rendering}
+            className="hidden md:block px-3 py-1.5 border border-cyan-800 text-cyan-300 hover:bg-cyan-950 disabled:opacity-40 rounded-lg text-xs font-semibold transition-colors"
+          >
+            {rendering && renderKind === "trailer"
+              ? "Extrait..."
+              : `Extrait ${project.trailerDurationSeconds ?? 30}s`}
           </button>
           {renderUrl && (
             <a
@@ -679,6 +710,14 @@ export function Editor({ initialProject }: Props) {
                   setFillingCards(false),
                 );
               }}
+              onEpisode={(episode) => {
+                const cards = applyEpisode(
+                  episode,
+                  project.mainVideoDurationSeconds,
+                );
+                setSelectedPresetId(episode.presetId);
+                update({ style: "educatif", cards });
+              }}
               fillingCards={fillingCards}
               brollSuggestions={brollSuggestions}
               setBrollSuggestions={setBrollSuggestions}
@@ -706,6 +745,220 @@ export function Editor({ initialProject }: Props) {
               >
                 Creer mon montage
               </button>
+            </div>
+          )}
+
+          {/* Template picker overlay — shown after transcription, user picks a template */}
+          {waitingForTemplate && templateSuggestions && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-950/80 backdrop-blur-md">
+              <div className="w-full max-w-xl px-4">
+                <h2 className="text-base font-semibold text-white text-center mb-1">
+                  Quel style de montage ?
+                </h2>
+                <p className="text-xs text-zinc-500 text-center mb-5">
+                  L’IA a analyse ton contenu. Choisis le template qui correspond
+                  le mieux.
+                </p>
+                <div className="flex flex-col gap-3">
+                  {templateSuggestions.map((s, i) => (
+                    <button
+                      key={s.templateId}
+                      onClick={() => continueWithTemplate(s.preset)}
+                      className={`group relative text-left px-4 py-3 rounded-xl border transition-all ${
+                        i === 0
+                          ? "border-white/30 bg-zinc-800/80 hover:bg-zinc-700/80"
+                          : "border-zinc-700/50 bg-zinc-800/40 hover:bg-zinc-800/70"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-white">
+                          {s.preset.name}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-mono">
+                          {Math.round(s.confidence * 100)}%
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-400 leading-snug mb-1.5">
+                        {s.preset.description}
+                      </p>
+                      {/* Mini timeline mockup */}
+                      <div className="relative h-5 bg-zinc-900/80 rounded my-2 overflow-hidden">
+                        {/* Video bar */}
+                        <div className="absolute inset-0 bg-zinc-700/30 rounded" />
+                        {s.preset.cardSlots.length === 0 ? (
+                          <div className="absolute inset-y-0 left-1 right-1 flex items-center">
+                            <span className="text-[8px] text-zinc-500 italic">
+                              sous-titres seulement
+                            </span>
+                          </div>
+                        ) : (
+                          s.preset.cardSlots.map((slot, si) => {
+                            const colors: Record<string, string> = {
+                              "root-letters": "bg-amber-500/70",
+                              "single-word": "bg-sky-500/70",
+                              verse: "bg-emerald-500/70",
+                              "family-recap": "bg-purple-500/70",
+                              "custom-text": "bg-zinc-400/60",
+                              cta: "bg-rose-500/70",
+                              "price-tag": "bg-orange-500/70",
+                              "feature-list": "bg-teal-500/70",
+                            };
+                            const labels: Record<string, string> = {
+                              "root-letters": "ر",
+                              "single-word": "ك",
+                              verse: "آ",
+                              "family-recap": "ع",
+                              "custom-text": "T",
+                              cta: "CTA",
+                              "price-tag": "$",
+                              "feature-list": "F",
+                            };
+                            return (
+                              <div
+                                key={si}
+                                className={`absolute top-0.5 bottom-0.5 rounded-sm flex items-center justify-center ${colors[slot.type] ?? "bg-zinc-500/50"}`}
+                                style={{
+                                  left: `${slot.startRatio * 100}%`,
+                                  width: `${Math.max((slot.endRatio - slot.startRatio) * 100, 2)}%`,
+                                }}
+                                title={slot.type}
+                              >
+                                <span className="text-[7px] font-bold text-white/80 leading-none">
+                                  {labels[slot.type] ?? "?"}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 italic">
+                        {s.reason}
+                      </p>
+                      {/* Confidence bar */}
+                      <div className="mt-2 h-0.5 bg-zinc-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-white/60 rounded-full transition-all"
+                          style={{
+                            width: `${Math.round(s.confidence * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      {i === 0 && (
+                        <span className="absolute -top-2 right-3 px-2 py-0.5 bg-white text-zinc-900 text-[9px] font-bold rounded-full uppercase tracking-wider">
+                          Recommande
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* B-roll picker overlay — after auto-pilot, user picks visuals */}
+          {!autoPilot && !waitingForTemplate && brollSuggestions.length > 0 && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-950/80 backdrop-blur-md overflow-auto">
+              <div className="w-full max-w-lg px-4 py-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-white">
+                      Choisis tes visuels
+                    </h2>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      {brollSuggestions.length} moment
+                      {brollSuggestions.length > 1 ? "s" : ""} a illustrer —
+                      clique sur une image ou passe
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setBrollSuggestions([])}
+                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-lg text-xs transition-colors"
+                  >
+                    Tout passer
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {brollSuggestions.map((s, si) => {
+                    const allMedia = [
+                      ...s.images.slice(0, 6),
+                      ...s.videos.slice(0, 4),
+                    ];
+                    return (
+                      <div
+                        key={si}
+                        className="rounded-xl bg-zinc-800/60 p-3 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-amber-400">
+                              {s.keyword}
+                            </span>
+                            <span className="text-[10px] text-zinc-600 font-mono">
+                              {s.startTime.toFixed(1)}s — {s.endTime.toFixed(1)}
+                              s
+                            </span>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setBrollSuggestions(
+                                brollSuggestions.filter((_, i) => i !== si),
+                              )
+                            }
+                            className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
+                          >
+                            Passer
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-zinc-500 italic">
+                          {s.reason}
+                        </p>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {allMedia.map((media) => (
+                            <button
+                              key={media.id}
+                              onClick={() => {
+                                update({
+                                  brolls: [
+                                    ...project.brolls,
+                                    {
+                                      id: crypto.randomUUID(),
+                                      startTime: s.startTime,
+                                      endTime: s.endTime,
+                                      fileUrl: media.url,
+                                      mediaType: media.type,
+                                    },
+                                  ],
+                                });
+                                setBrollSuggestions(
+                                  brollSuggestions.filter((_, i) => i !== si),
+                                );
+                              }}
+                              className="group relative rounded-lg overflow-hidden border-2 border-transparent hover:border-amber-400 transition-all aspect-[3/4]"
+                            >
+                              <img
+                                src={media.thumb}
+                                alt={s.keyword}
+                                className="w-full h-full object-cover"
+                              />
+                              {media.type === "video" && (
+                                <span className="absolute top-1 left-1 bg-black/70 text-[8px] text-white px-1.5 py-0.5 rounded font-medium">
+                                  VIDEO
+                                </span>
+                              )}
+                              <span className="absolute inset-0 bg-amber-500/0 group-hover:bg-amber-500/20 transition-colors flex items-center justify-center">
+                                <span className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-900 text-lg font-bold">
+                                  +
+                                </span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
@@ -812,7 +1065,7 @@ export function Editor({ initialProject }: Props) {
           AI
         </button>
         <button
-          onClick={handleRender}
+          onClick={() => void handleRender("full")}
           disabled={rendering}
           className="px-3 py-1.5 bg-white text-zinc-900 rounded-lg text-xs font-semibold disabled:opacity-40"
         >

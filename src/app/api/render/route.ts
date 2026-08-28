@@ -4,23 +4,37 @@ import { promisify } from "util";
 import { join } from "path";
 import { existsSync } from "fs";
 import { writeFile, unlink } from "fs/promises";
+import { createReadStream } from "fs";
 import { tmpdir } from "os";
+import { put } from "@vercel/blob";
+import { requireUser } from "@/lib/server/auth";
+import { apiError } from "@/lib/server/http";
 
 const execFileAsync = promisify(execFile);
 
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
+  try {
+    await requireUser();
+  } catch (error) {
+    return apiError(error);
+  }
   // Detect content type to parse correctly (FormData or JSON, never both)
   const contentType = req.headers.get("content-type") ?? "";
   let formData: FormData | null = null;
   let projectJson: Record<string, unknown> | null = null;
+  let clipDurationSeconds: number | null = null;
 
   if (contentType.includes("multipart/form-data")) {
     formData = await req.formData();
     const projectRaw = formData.get("project") as string | null;
     if (projectRaw) {
       projectJson = JSON.parse(projectRaw);
+    }
+    const clipRaw = formData.get("clipDurationSeconds");
+    if (typeof clipRaw === "string" && Number(clipRaw) > 0) {
+      clipDurationSeconds = Math.min(Number(clipRaw), 60);
     }
   } else {
     // JSON body fallback
@@ -109,23 +123,39 @@ export async function POST(req: Request) {
 
     const props = JSON.stringify({ project: projectJson });
 
+    const renderArgs = [
+      "remotion",
+      "render",
+      "src/remotion/index.ts",
+      "MontageStudio",
+      outputPath,
+      "--props",
+      props,
+      "--codec",
+      "h264",
+      "--image-format",
+      "jpeg",
+      "--quality",
+      "80",
+    ];
+    if (clipDurationSeconds) {
+      const fps = Number(projectJson.fps) || 30;
+      const availableSeconds =
+        Number(projectJson.mainVideoDurationSeconds) +
+          (projectJson.outroVideoUrl
+            ? Number(projectJson.outroDurationSeconds) || 0
+            : 0) ||
+        clipDurationSeconds;
+      const trailerSeconds = Math.min(clipDurationSeconds, availableSeconds);
+      renderArgs.push(
+        "--frames",
+        `0-${Math.max(0, Math.ceil(trailerSeconds * fps) - 1)}`,
+      );
+    }
+
     await execFileAsync(
       "npx",
-      [
-        "remotion",
-        "render",
-        "src/remotion/index.ts",
-        "MontageStudio",
-        outputPath,
-        "--props",
-        props,
-        "--codec",
-        "h264",
-        "--image-format",
-        "jpeg",
-        "--quality",
-        "80",
-      ],
+      renderArgs,
       {
         cwd: process.cwd(),
         timeout: 280000,
@@ -133,9 +163,22 @@ export async function POST(req: Request) {
       },
     );
 
+    let url = `/renders/${outputFile}`;
+    let cloudStored = false;
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const blob = await put(`renders/${outputFile}`, createReadStream(outputPath), {
+        access: "public",
+        contentType: "video/mp4",
+        multipart: true,
+      });
+      url = blob.url;
+      cloudStored = true;
+    }
     return NextResponse.json({
-      url: `/renders/${outputFile}`,
-      message: "Rendu termine",
+      url,
+      cloudStored,
+      kind: clipDurationSeconds ? "trailer" : "full",
+      message: clipDurationSeconds ? "Extrait terminé" : "Rendu terminé",
     });
   } catch (err) {
     return NextResponse.json(

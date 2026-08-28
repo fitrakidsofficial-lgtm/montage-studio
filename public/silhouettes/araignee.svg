@@ -1,0 +1,6 @@
+<svg viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round">
+ <path d="M96 72 L52 34 L28 46 M96 84 L40 70 L14 84 M100 96 L46 108 L24 130 M104 106 L74 134 L60 152"/>
+ <path d="M144 72 L188 34 L212 46 M144 84 L200 70 L226 84 M140 96 L194 108 L216 130 M136 106 L166 134 L180 152"/></g>
+ <ellipse cx="120" cy="96" rx="42" ry="34" fill="currentColor"/>
+ <ellipse cx="120" cy="62" rx="26" ry="22" fill="currentColor"/>
+ <circle cx="112" cy="58" r="5" fill="#FFF8EC"/><circle cx="128" cy="58" r="5" fill="#FFF8EC"/></svg>

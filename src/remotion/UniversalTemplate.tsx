@@ -51,7 +51,7 @@ function SyncedVideo({
   seekTime?: number;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const lastFrameRef = useRef(0);
+  const prevFrameRef = useRef(-1);
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const targetTime = seekTime ?? frame / fps;
@@ -60,11 +60,16 @@ function SyncedVideo({
     const v = videoRef.current;
     if (!v) return;
 
-    const isPlaying = frame !== lastFrameRef.current;
-    lastFrameRef.current = frame;
+    const prevFrame = prevFrameRef.current;
+    prevFrameRef.current = frame;
 
-    // Sync position if drifted > 0.3s
-    if (Math.abs(v.currentTime - targetTime) > 0.3) {
+    // Detect if Remotion is actively advancing frames (playing)
+    const frameDelta = frame - prevFrame;
+    const isAdvancing = prevFrame >= 0 && frameDelta > 0 && frameDelta <= 2;
+
+    // Sync position — tighter threshold for better audio sync
+    const drift = Math.abs(v.currentTime - targetTime);
+    if (drift > 0.15) {
       v.currentTime = targetTime;
     }
 
@@ -73,9 +78,9 @@ function SyncedVideo({
     v.muted = volume <= 0;
 
     // Play/pause sync
-    if (isPlaying && v.paused) {
+    if (isAdvancing && v.paused) {
       v.play().catch(() => {});
-    } else if (!isPlaying && !v.paused) {
+    } else if (!isAdvancing && !v.paused) {
       v.pause();
     }
   });
@@ -224,6 +229,7 @@ export function UniversalTemplate({ project }: Props) {
         brand={project.brand}
         style={project.style}
         currentTime={sourceTime}
+        words={project.words}
       />
 
       {/* Logo */}

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { VideoProject } from "@/lib/types";
-import { loadProject } from "@/lib/project-store";
+import { loadProject, loadProjectFromCloud } from "@/lib/project-store";
+import { ApiClientError } from "@/lib/client-api";
 import { Editor } from "@/components/Editor";
 
 export default function EditorPage() {
@@ -13,20 +14,37 @@ export default function EditorPage() {
 
   useEffect(() => {
     const id = params.id as string;
-    const p = loadProject(id);
-    if (!p) {
-      router.push("/");
-      return;
-    }
-    // Blob URLs don't survive page reload — clear stale ones
-    if (p.mainVideoUrl?.startsWith("blob:")) {
-      p.mainVideoUrl = null;
-    }
-    if (p.brand.logoUrl?.startsWith("blob:")) {
-      p.brand.logoUrl = "/fitra-kids-logo.png";
-    }
-    p.brolls = p.brolls.filter((b) => !b.fileUrl.startsWith("blob:"));
-    setProject(p);
+    let cancelled = false;
+    void loadProjectFromCloud(id)
+      .catch((loadError: unknown) => {
+        if (loadError instanceof ApiClientError && loadError.status === 401) {
+          router.replace("/login");
+          return null;
+        }
+        return loadProject(id);
+      })
+      .then((loaded) => {
+        if (cancelled) return;
+        if (!loaded) {
+          router.replace("/");
+          return;
+        }
+        const cleanProject = structuredClone(loaded);
+        // Blob URLs don't survive page reload — clear stale ones.
+        if (cleanProject.mainVideoUrl?.startsWith("blob:")) {
+          cleanProject.mainVideoUrl = null;
+        }
+        if (cleanProject.brand.logoUrl?.startsWith("blob:")) {
+          cleanProject.brand.logoUrl = "/fitra-kids-logo.png";
+        }
+        cleanProject.brolls = cleanProject.brolls.filter(
+          (broll) => !broll.fileUrl.startsWith("blob:"),
+        );
+        setProject(cleanProject);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [params.id, router]);
 
   if (!project) {

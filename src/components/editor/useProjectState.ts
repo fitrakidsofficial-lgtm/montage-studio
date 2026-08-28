@@ -28,7 +28,10 @@ export function useProjectState(initialProject: VideoProject) {
     });
   }, []);
 
+  // The refs intentionally back this imperative undo stack.
+  // eslint-disable-next-line react-hooks/refs
   const canUndo = pointerRef.current > 0;
+  // eslint-disable-next-line react-hooks/refs
   const canRedo = pointerRef.current < historyRef.current.length - 1;
 
   const undo = useCallback(() => {

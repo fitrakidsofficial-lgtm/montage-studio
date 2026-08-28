@@ -32,6 +32,57 @@ export const FITRA_KIDS_BRAND: BrandConfig = {
   logoUrl: "/fitra-kids-logo.png",
 };
 
+/**
+ * Charte "Kids vidéo" — réservée aux reels.
+ * Turquoise pop : contraste fort, couleurs hors palette YouTube (ni rouge, ni blanc, ni noir dominants).
+ * Les clés restent celles de BrandConfig pour que tous les layers fonctionnent sans changement :
+ *   teal  = le turquoise de fond      gold   = le jaune soleil (accents, chips)
+ *   orange= le corail (pastilles)     cream  = le fond des cartes
+ *   night = l'encre (texte, contours)
+ */
+export const MISSION_KIDS_VIDEO_BRAND: BrandConfig = {
+  colors: {
+    cream: "#FFF8EC",
+    gold: "#FFC93C",
+    orange: "#FF6B5A",
+    teal: "#14B8A6",
+    night: "#06333B",
+  },
+  fonts: {
+    title: "'Luckiest Guy', 'Arial Rounded MT Bold', sans-serif",
+    body: "'Itim', Arial, sans-serif",
+    arabic: "'Noto Sans Arabic', 'Geeza Pro', sans-serif",
+  },
+  logoUrl: "/fitra-kids-logo.png",
+};
+
+/**
+ * Charte "Kids vidéo — Toy Box" : orange + turquoise sur fond bleu-canard sombre.
+ * Paire complémentaire au contraste le plus fort, hors palette YouTube.
+ */
+export const MISSION_KIDS_TOYBOX_BRAND: BrandConfig = {
+  colors: {
+    cream: "#FFF8EC",
+    gold: "#FF9F1C",
+    orange: "#FFBF69",
+    teal: "#2EC4B6",
+    night: "#1B3A47",
+  },
+  fonts: {
+    title: "'Luckiest Guy', 'Arial Rounded MT Bold', sans-serif",
+    body: "'Itim', Arial, sans-serif",
+    arabic: "'Noto Sans Arabic', 'Geeza Pro', sans-serif",
+  },
+  logoUrl: "/fitra-kids-logo.png",
+};
+
+export const BRAND_PRESETS = [
+  { id: "plateforme", name: "Plateforme", brand: FITRA_KIDS_BRAND },
+  { id: "kids-turquoise", name: "Turquoise", brand: MISSION_KIDS_VIDEO_BRAND },
+  { id: "kids-toybox", name: "Toy Box", brand: MISSION_KIDS_TOYBOX_BRAND },
+] as const;
+
+
 export type TemplateStyle = "educatif" | "promo" | "broll";
 
 export interface SubtitleWord {
@@ -151,6 +202,8 @@ export interface BrollItem {
 
 export interface VideoProject {
   id: string;
+  /** Brand/workspace owning this montage. Null only for legacy local data. */
+  studioProjectId: string | null;
   name: string;
   style: TemplateStyle;
   brand: BrandConfig;
@@ -194,6 +247,12 @@ export interface VideoProject {
   /** CTA objective */
   ctaObjective:
     "engagement" | "save" | "share" | "subscribe" | "traffic" | "sale" | null;
+  /** Cross-platform distribution: full video on YouTube, teaser elsewhere. */
+  youtubeUrl: string;
+  trailerDurationSeconds: number;
+  trailerCta: string;
+  fullVideoUrl: string;
+  trailerVideoUrl: string;
 }
 
 export interface ZoomKeyframe {
@@ -208,12 +267,18 @@ export interface SocialCaptions {
   tiktok: { caption: string; hashtags: string[] };
 }
 
-export function createDefaultProject(): VideoProject {
+export function createDefaultProject(options?: {
+  studioProjectId?: string | null;
+  brand?: BrandConfig;
+}): VideoProject {
   return {
     id: crypto.randomUUID(),
+    studioProjectId: options?.studioProjectId ?? null,
     name: "Nouveau montage",
     style: "educatif",
-    brand: { ...FITRA_KIDS_BRAND },
+    brand: options?.brand
+      ? structuredClone(options.brand)
+      : structuredClone(FITRA_KIDS_BRAND),
     mainVideoUrl: null,
     mainVideoDurationSeconds: 60,
     fps: 30,
@@ -237,5 +302,10 @@ export function createDefaultProject(): VideoProject {
     subtitleFontFamily: "",
     hookStyle: "overlay",
     ctaObjective: null,
+    youtubeUrl: "",
+    trailerDurationSeconds: 30,
+    trailerCta: "Voir la vidéo complète sur YouTube — lien en bio.",
+    fullVideoUrl: "",
+    trailerVideoUrl: "",
   };
 }

@@ -29,6 +29,13 @@ interface BrollSuggestion {
   }[];
 }
 
+export interface TemplateSuggestion {
+  templateId: string;
+  reason: string;
+  confidence: number;
+  preset: TemplatePreset;
+}
+
 export function useAutoPilot(
   project: VideoProject,
   update: (patch: Partial<VideoProject>) => void,
@@ -40,10 +47,22 @@ export function useAutoPilot(
     [],
   );
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [templateSuggestions, setTemplateSuggestions] = useState<
+    TemplateSuggestion[] | null
+  >(null);
+  const [waitingForTemplate, setWaitingForTemplate] = useState(false);
+
   const videoFileRef = useRef<File | null>(null);
   const audioFileRef = useRef<File | null>(null);
   const bgMusicFileRef = useRef<File | null>(null);
   const brollFilesRef = useRef<Map<string, File>>(new Map());
+
+  // Stash transcription results for use after template selection
+  const transcriptDataRef = useRef<{
+    finalSubs: SubtitleSegment[];
+    finalWords: { word: string; start: number; end: number }[];
+    transcript: string;
+  } | null>(null);
 
   const detectSilenceCuts = useCallback(
     (words: { start: number; end: number }[]) => {
@@ -127,6 +146,7 @@ export function useAutoPilot(
     [],
   );
 
+  // ── Phase 1: Transcribe + detect templates → show suggestions ──
   const handleAutoPilot = useCallback(async () => {
     const file = audioFileRef.current || videoFileRef.current;
     if (!file) {
@@ -135,6 +155,7 @@ export function useAutoPilot(
     }
 
     setAutoPilot(true);
+    setTemplateSuggestions(null);
 
     try {
       // Step 1: Transcribe
@@ -173,23 +194,83 @@ export function useAutoPilot(
         .map((s: { text: string }) => s.text)
         .join(" ");
 
-      // Step 3: Detect best template
-      setAutoPilotStep("Detection du template...");
+      // Stash for phase 2
+      transcriptDataRef.current = { finalSubs, finalWords, transcript };
+
+      // Step 3: Detect templates → propose 3 suggestions
+      setAutoPilotStep("Analyse du contenu...");
       const detectRes = await fetch("/api/auto-detect-template", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript }),
       });
       const detectData = await detectRes.json();
-      const templateId = detectData.templateId || "broll-simple";
-      const preset = TEMPLATE_PRESETS.find((p) => p.id === templateId);
 
-      if (preset) {
+      const rawSuggestions: {
+        templateId: string;
+        reason: string;
+        confidence: number;
+      }[] = detectData.suggestions ?? [
+        {
+          templateId: detectData.templateId || "broll-simple",
+          reason: detectData.reason || "",
+          confidence: 1,
+        },
+      ];
+
+      // Resolve presets
+      const resolved: TemplateSuggestion[] = rawSuggestions
+        .map((s) => {
+          const preset = TEMPLATE_PRESETS.find((p) => p.id === s.templateId);
+          if (!preset) return null;
+          return { ...s, preset };
+        })
+        .filter((s): s is TemplateSuggestion => s !== null);
+
+      // If only 1 suggestion or all same, add fallbacks
+      const usedIds = new Set(resolved.map((s) => s.templateId));
+      if (resolved.length < 3) {
+        for (const p of TEMPLATE_PRESETS) {
+          if (resolved.length >= 3) break;
+          if (!usedIds.has(p.id)) {
+            resolved.push({
+              templateId: p.id,
+              reason: p.description,
+              confidence: 0.1,
+              preset: p,
+            });
+            usedIds.add(p.id);
+          }
+        }
+      }
+
+      setTemplateSuggestions(resolved.slice(0, 3));
+      setAutoPilotStep("Choisis un template");
+      setWaitingForTemplate(true);
+    } catch (err) {
+      alert("Erreur auto-pilote: " + (err as Error).message);
+      setAutoPilot(false);
+      setAutoPilotStep("");
+    }
+  }, [project.language, update]);
+
+  // ── Phase 2: User picked a template → continue montage ──
+  const continueWithTemplate = useCallback(
+    async (preset: TemplatePreset) => {
+      const data = transcriptDataRef.current;
+      if (!data) return;
+
+      setWaitingForTemplate(false);
+      setTemplateSuggestions(null);
+      const { finalSubs, finalWords, transcript } = data;
+
+      try {
+        // Apply template
         const cards = applyPreset(preset, project.mainVideoDurationSeconds);
         setSelectedPresetId(preset.id);
         update({ style: preset.style, cards });
 
-        // Step 4: Fill cards with AI
+        // Fill cards with AI
         if (preset.cardSlots.length > 0 && transcript.trim()) {
           setAutoPilotStep("Remplissage des cards...");
           const cardTypes = preset.cardSlots.map((slot, i) => ({
@@ -215,164 +296,157 @@ export function useAutoPilot(
             update({ cards: filled });
           }
         }
-      }
 
-      // Step 5: Crunchy Director — AI-driven editing decisions
-      setAutoPilotStep("Analyse editoriale (Director IA)...");
-      const currentStyle = preset?.style || "educatif";
-      try {
-        const dirRes = await fetch("/api/director-analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            subtitles: finalSubs,
-            words: finalWords,
-            duration: project.mainVideoDurationSeconds,
-            style: currentStyle,
-          }),
-        });
-        const dirData = await dirRes.json();
-        if (dirRes.ok && Array.isArray(dirData.decisions)) {
-          // Convert director decisions to project data
-          const zooms: { time: number; scale: number; duration: number }[] = [];
-          const silenceCuts: { start: number; end: number }[] = [];
-          const texteCles: { time: number; duration: number; text: string }[] =
-            [];
-          const patternInterrupts: { time: number; duration: number }[] = [];
-          const brollKeywords: {
-            keyword: string;
-            startTime: number;
-            endTime: number;
-          }[] = [];
+        // Director IA
+        setAutoPilotStep("Analyse editoriale (Director IA)...");
+        const currentStyle = preset.style;
+        try {
+          const dirRes = await fetch("/api/director-analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              subtitles: finalSubs,
+              words: finalWords,
+              duration: project.mainVideoDurationSeconds,
+              style: currentStyle,
+            }),
+          });
+          const dirData = await dirRes.json();
+          if (dirRes.ok && Array.isArray(dirData.decisions)) {
+            const zooms: { time: number; scale: number; duration: number }[] =
+              [];
+            const silenceCuts: { start: number; end: number }[] = [];
+            const texteCles: {
+              time: number;
+              duration: number;
+              text: string;
+            }[] = [];
+            const patternInterrupts: { time: number; duration: number }[] = [];
+            const brollKeywords: {
+              keyword: string;
+              startTime: number;
+              endTime: number;
+            }[] = [];
 
-          for (const d of dirData.decisions) {
-            switch (d.action) {
-              case "zoom":
-                zooms.push({
-                  time: d.time,
-                  scale: d.intensity ?? zoomIntensity,
-                  duration: d.duration,
-                });
-                break;
-              case "jump-cut":
-                silenceCuts.push({
-                  start: d.time,
-                  end: d.time + d.duration,
-                });
-                break;
-              case "broll":
-                if (d.keyword) {
-                  brollKeywords.push({
-                    keyword: d.keyword,
-                    startTime: d.time,
-                    endTime: d.time + d.duration,
+            for (const d of dirData.decisions) {
+              switch (d.action) {
+                case "zoom":
+                  zooms.push({
+                    time: d.time,
+                    scale: d.intensity ?? zoomIntensity,
+                    duration: d.duration,
                   });
-                }
-                break;
-              case "texte-cle":
-                if (d.text) {
-                  texteCles.push({
+                  break;
+                case "jump-cut":
+                  silenceCuts.push({ start: d.time, end: d.time + d.duration });
+                  break;
+                case "broll":
+                  if (d.keyword) {
+                    brollKeywords.push({
+                      keyword: d.keyword,
+                      startTime: d.time,
+                      endTime: d.time + d.duration,
+                    });
+                  }
+                  break;
+                case "texte-cle":
+                  if (d.text) {
+                    texteCles.push({
+                      time: d.time,
+                      duration: d.duration,
+                      text: d.text,
+                    });
+                  }
+                  break;
+                case "pattern-interrupt":
+                  patternInterrupts.push({
                     time: d.time,
                     duration: d.duration,
-                    text: d.text,
                   });
-                }
-                break;
-              case "pattern-interrupt":
-                patternInterrupts.push({
-                  time: d.time,
-                  duration: d.duration,
-                });
-                break;
+                  break;
+              }
             }
-          }
 
-          update({ zooms, silenceCuts, texteCles, patternInterrupts });
+            update({ zooms, silenceCuts, texteCles, patternInterrupts });
 
-          // Step 6: Search B-rolls using Director keywords + Pexels
-          if (brollKeywords.length > 0) {
-            setAutoPilotStep("Recherche de B-rolls...");
-            const brollRes = await fetch("/api/suggest-brolls", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                subtitles: finalSubs,
-                duration: project.mainVideoDurationSeconds,
-                directorKeywords: brollKeywords,
-              }),
-            });
-            const brollData = await brollRes.json();
-            if (brollRes.ok && brollData.suggestions) {
-              setBrollSuggestions(brollData.suggestions);
-              const autoBrolls = brollData.suggestions
-                .filter((s: BrollSuggestion) => s.images.length > 0)
-                .map((s: BrollSuggestion) => ({
-                  id: crypto.randomUUID(),
-                  startTime: s.startTime,
-                  endTime: s.endTime,
-                  fileUrl: s.images[0].url,
-                  mediaType: "image" as const,
-                }));
-              if (autoBrolls.length > 0) {
-                update({ brolls: autoBrolls });
+            // Search B-rolls
+            if (brollKeywords.length > 0) {
+              setAutoPilotStep("Recherche de B-rolls...");
+              const brollRes = await fetch("/api/suggest-brolls", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  subtitles: finalSubs,
+                  duration: project.mainVideoDurationSeconds,
+                  directorKeywords: brollKeywords,
+                }),
+              });
+              const brollData = await brollRes.json();
+              if (brollRes.ok && brollData.suggestions) {
+                // Store suggestions for user to pick — don't auto-add
+                setBrollSuggestions(brollData.suggestions);
               }
             }
           }
+        } catch {
+          const silenceCuts = detectSilenceCuts(finalWords);
+          const zooms = detectZooms(
+            finalSubs,
+            project.mainVideoDurationSeconds,
+          );
+          update({ silenceCuts, zooms });
         }
-      } catch {
-        // Fallback to naive detection if Director fails
-        const silenceCuts = detectSilenceCuts(finalWords);
-        const zooms = detectZooms(finalSubs, project.mainVideoDurationSeconds);
-        update({ silenceCuts, zooms });
-      }
 
-      // Step 7: Generate captions
-      setAutoPilotStep("Generation des descriptions...");
-      const captions = await generateCaptions(transcript, currentStyle);
-      if (captions) {
-        update({ captions });
-      }
+        // Generate captions
+        setAutoPilotStep("Generation des descriptions...");
+        const captions = await generateCaptions(transcript, currentStyle);
+        if (captions) {
+          update({ captions });
+        }
 
-      // Step 8: Generate hook + auto CTA
-      setAutoPilotStep("Generation du hook...");
-      const introText = await generateIntro(transcript);
-      const ctaObjective =
-        currentStyle === "educatif"
-          ? "save"
-          : currentStyle === "promo"
-            ? "traffic"
-            : "engagement";
-      if (introText) {
-        update({
-          introText,
-          introDuration: 2.5,
-          hookStyle: "overlay",
-          ctaObjective: ctaObjective as "save" | "traffic" | "engagement",
-        });
-      } else {
-        update({
-          ctaObjective: ctaObjective as "save" | "traffic" | "engagement",
-        });
-      }
+        // Generate hook + CTA
+        setAutoPilotStep("Generation du hook...");
+        const introText = await generateIntro(transcript);
+        const ctaObjective =
+          currentStyle === "educatif"
+            ? "save"
+            : currentStyle === "promo"
+              ? "traffic"
+              : "engagement";
+        if (introText) {
+          update({
+            introText,
+            introDuration: 2.5,
+            hookStyle: "overlay",
+            ctaObjective: ctaObjective as "save" | "traffic" | "engagement",
+          });
+        } else {
+          update({
+            ctaObjective: ctaObjective as "save" | "traffic" | "engagement",
+          });
+        }
 
-      setAutoPilotStep("Montage termine !");
-    } catch (err) {
-      alert("Erreur auto-pilote: " + (err as Error).message);
-    } finally {
-      setTimeout(() => {
-        setAutoPilot(false);
-        setAutoPilotStep("");
-      }, 2000);
-    }
-  }, [
-    project.mainVideoDurationSeconds,
-    project.language,
-    update,
-    detectSilenceCuts,
-    detectZooms,
-    generateCaptions,
-    generateIntro,
-  ]);
+        setAutoPilotStep("Montage termine !");
+      } catch (err) {
+        alert("Erreur auto-pilote: " + (err as Error).message);
+      } finally {
+        transcriptDataRef.current = null;
+        setTimeout(() => {
+          setAutoPilot(false);
+          setAutoPilotStep("");
+        }, 2000);
+      }
+    },
+    [
+      project.mainVideoDurationSeconds,
+      update,
+      zoomIntensity,
+      detectSilenceCuts,
+      detectZooms,
+      generateCaptions,
+      generateIntro,
+    ],
+  );
 
   const handlePreset = useCallback(
     async (preset: TemplatePreset) => {
@@ -418,11 +492,14 @@ export function useAutoPilot(
     setBrollSuggestions,
     selectedPresetId,
     setSelectedPresetId,
+    templateSuggestions,
+    waitingForTemplate,
     videoFileRef,
     audioFileRef,
     bgMusicFileRef,
     brollFilesRef,
     handleAutoPilot,
     handlePreset,
+    continueWithTemplate,
   };
 }

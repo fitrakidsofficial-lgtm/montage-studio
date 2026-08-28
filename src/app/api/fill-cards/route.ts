@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { getUser } from "@/lib/server/auth";
 
 export async function POST(req: Request) {
+  if (!(await getUser())) {
+    return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
+  }
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -37,10 +41,12 @@ Tu extrais du transcript les informations demandees pour remplir des cards de mo
 REGLES STRICTES:
 - Reponds UNIQUEMENT en JSON valide, sans markdown, sans commentaires
 - Pour l'arabe, utilise l'ecriture arabe avec les voyelles completes (tashkeel/harakat)
-- Si une info n'est pas dans le transcript, laisse le champ vide ""
-- N'INVENTE RIEN: extrait uniquement ce qui est dit dans le transcript
+- VERSETS CORANIQUES: quand le transcript mentionne un verset par sa reference (sourate + numero), remplis le texte arabe COMPLET du verset et sa traduction francaise. Le Coran est un texte canonique fixe, ce n'est pas de l'invention.
+- MOTS ARABES: quand le transcript parle d'un mot arabe (meme en phonetique francaise), retrouve l'ecriture arabe correcte avec voyelles et sa traduction.
+- RACINES: quand le transcript parle d'une racine ou d'une famille de mots, identifie les 3 lettres racines arabes et les mots derives mentionnes.
 - Pour les familles de mots: verifie que chaque mot partage REELLEMENT la meme racine trilittere arabe
-- Ne confonds pas des mots qui se ressemblent phonetiquement mais qui ont des racines differentes`,
+- Ne confonds pas des mots qui se ressemblent phonetiquement mais qui ont des racines differentes
+- Si une info n'est vraiment pas identifiable dans le transcript, laisse le champ vide ""`,
         },
         { role: "user", content: prompt },
       ],
