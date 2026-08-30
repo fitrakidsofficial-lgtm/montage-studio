@@ -1,28 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Itim&family=Luckiest+Guy&family=Noto+Sans+Arabic:wght@400;700&display=swap");
 @import "tailwindcss";
-
-@font-face {
-  font-family: "Luckiest Guy";
-  src: url("/fonts/luckiest-guy-latin.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Itim";
-  src: url("/fonts/itim-latin.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Noto Sans Arabic";
-  src: url("/fonts/noto-arabic.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
 
 :root {
   --background: #09090b;

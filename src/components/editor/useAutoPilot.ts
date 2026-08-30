@@ -1,12 +1,177 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import type { VideoProject, SubtitleSegment } from "@/lib/types";
+import type { VideoProject, SubtitleSegment, ConceptCard } from "@/lib/types";
 import {
   applyPreset,
   TEMPLATE_PRESETS,
   type TemplatePreset,
 } from "@/lib/template-presets";
+
+/* ── Sync card timing with transcript ── */
+
+/** Normalize text: lowercase, no accents, no punctuation */
+function norm(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim();
+}
+
+/**
+ * Search patterns for each card type.
+ * Each pattern group is tried in order. First match wins.
+ * Patterns are searched in subtitle text (normalized).
+ */
+function getSearchPatterns(content: ConceptCard["content"]): string[][] {
+  switch (content.type) {
+    case "root-letters":
+      // Priority 1: "trois lettres" / "les lettres"
+      // Priority 2: "racine" / "la racine"
+      // Priority 3: letter names (nun, sad, ha, sin, etc.)
+      return [
+        ["trois lettres", "les lettres", "ces lettres"],
+        ["la racine", "racine"],
+      ];
+    case "single-word": {
+      // Search for the French translation words in the narration
+      const translationWords = norm(content.translation)
+        .split(/\s+/)
+        .filter((w) => w.length > 3);
+      return [
+        translationWords, // exact translation words
+        ["ce mot", "un mot", "le mot"], // generic word introduction
+      ];
+    }
+    case "verse": {
+      // Search for surah reference
+      const surahWords = norm(content.surahLabel)
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !["sourate", "verset"].includes(w));
+      return [
+        surahWords, // surah name (e.g. "araf", "fatiha")
+        ["sourate", "verset", "le verset", "ce verset"],
+        ["dit allah", "dans le coran"],
+      ];
+    }
+    case "family-recap":
+      return [
+        ["meme famille", "meme racine", "tous ces mots"],
+        ["famille", "appartiennent"],
+        ["meme idee", "idee commune"],
+      ];
+    case "custom-text":
+      return [
+        ["souviens", "retiens", "conclusion", "resume"],
+        ["decouvrir", "secret", "debut"],
+      ];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Find the best timestamp for a card by searching subtitle text.
+ * Searches subtitle groups in priority order.
+ * afterTime: only match mentions AFTER this time (prevents reusing same moment).
+ */
+function findBestMention(
+  patterns: string[][],
+  subs: SubtitleSegment[],
+  afterTime: number,
+): number | null {
+  for (const group of patterns) {
+    for (const pattern of group) {
+      // Search subtitles after afterTime first
+      for (const sub of subs) {
+        if (sub.start <= afterTime) continue;
+        if (norm(sub.text).includes(pattern)) {
+          return sub.start;
+        }
+      }
+    }
+  }
+  // Fallback: search without afterTime constraint
+  for (const group of patterns) {
+    for (const pattern of group) {
+      for (const sub of subs) {
+        if (norm(sub.text).includes(pattern)) {
+          return sub.start;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Default card durations by type (seconds) */
+const CARD_DURATIONS: Record<string, number> = {
+  "root-letters": 4,
+  "single-word": 4,
+  verse: 7,
+  "family-recap": 8,
+  "custom-text": 5,
+  cta: 4,
+  "price-tag": 4,
+  "feature-list": 6,
+  "opinion-choice": 8,
+};
+
+/**
+ * Sync card timing to transcript: place each card when its content
+ * is actually mentioned in the narration (using Whisper timestamps).
+ */
+function syncCardTiming(
+  cards: ConceptCard[],
+  subs: SubtitleSegment[],
+  _words: { word: string; start: number; end: number }[],
+  totalDuration: number,
+): ConceptCard[] {
+  if (!subs || subs.length === 0) return cards;
+
+  let lastEndTime = -1;
+  const synced: ConceptCard[] = [];
+
+  for (const card of cards) {
+    const patterns = getSearchPatterns(card.content);
+    if (patterns.length === 0) {
+      synced.push(card);
+      lastEndTime = Math.max(lastEndTime, card.endTime);
+      continue;
+    }
+
+    const mention = findBestMention(patterns, subs, lastEndTime);
+    if (mention === null) {
+      synced.push(card);
+      lastEndTime = Math.max(lastEndTime, card.endTime);
+      continue;
+    }
+
+    const duration = CARD_DURATIONS[card.content.type] ?? 4;
+    const startTime = Math.max(0, mention - 0.5);
+    const endTime = Math.min(totalDuration, startTime + duration);
+
+    synced.push({ ...card, startTime, endTime });
+    lastEndTime = endTime;
+  }
+
+  // Final pass: prevent overlaps
+  for (let i = 1; i < synced.length; i++) {
+    const prev = synced[i - 1];
+    if (synced[i].startTime < prev.endTime + 0.5) {
+      const dur = synced[i].endTime - synced[i].startTime;
+      synced[i] = {
+        ...synced[i],
+        startTime: prev.endTime + 0.5,
+        endTime: Math.min(totalDuration, prev.endTime + 0.5 + dur),
+      };
+    }
+  }
+
+  return synced;
+}
 
 interface BrollSuggestion {
   keyword: string;
@@ -293,7 +458,15 @@ export function useAutoPilot(
               if (!aiContent) return card;
               return { ...card, content: { ...card.content, ...aiContent } };
             });
-            update({ cards: filled });
+            // Sync card timing with transcript
+            setAutoPilotStep("Synchronisation des cards...");
+            const synced = syncCardTiming(
+              filled,
+              finalSubs,
+              finalWords,
+              project.mainVideoDurationSeconds,
+            );
+            update({ cards: synced });
           }
         }
 
@@ -478,11 +651,23 @@ export function useAutoPilot(
             if (!aiContent) return card;
             return { ...card, content: { ...card.content, ...aiContent } };
           });
-          update({ cards: filled });
+          // Sync card timing with transcript
+          const synced = syncCardTiming(
+            filled,
+            project.subtitles,
+            project.words ?? [],
+            project.mainVideoDurationSeconds,
+          );
+          update({ cards: synced });
         }
       } catch {}
     },
-    [project.mainVideoDurationSeconds, project.subtitles, update],
+    [
+      project.mainVideoDurationSeconds,
+      project.subtitles,
+      project.words,
+      update,
+    ],
   );
 
   return {

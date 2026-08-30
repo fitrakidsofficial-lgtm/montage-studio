@@ -203,7 +203,8 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
     id: "enigme-mot",
     style: "educatif",
     name: "① Énigme — Devine le mot",
-    description: "Mot arabe caché, 3 propositions, tic-tac, reveal, CTA MISSION",
+    description:
+      "Mot arabe caché, 3 propositions, tic-tac, reveal, CTA MISSION",
     cardSlots: [
       {
         type: "custom-text",
@@ -212,7 +213,11 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
         content: {
           type: "custom-text",
           lines: [
-            { text: "IL RÉCITE CE MOT. IL VEUT DIRE QUOI ?", fontSize: 56, color: "teal" },
+            {
+              text: "IL RÉCITE CE MOT. IL VEUT DIRE QUOI ?",
+              fontSize: 56,
+              color: "teal",
+            },
             { text: "1 · ", fontSize: 48, color: "cream" },
             { text: "2 · ", fontSize: 48, color: "cream" },
             { text: "3 · ", fontSize: 48, color: "cream" },
@@ -273,7 +278,8 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
     id: "enigme-histoire",
     style: "educatif",
     name: "② Énigme — L'histoire derrière",
-    description: "Récit du contexte : énigme, reveal, verset, leçon, CTA MISSION",
+    description:
+      "Récit du contexte : énigme, reveal, verset, leçon, CTA MISSION",
     cardSlots: [
       {
         type: "custom-text",
@@ -337,7 +343,8 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
     id: "enigme-lecon",
     style: "educatif",
     name: "③ Énigme — Ça change quoi aujourd'hui",
-    description: "Situation du quotidien, le mot du Coran, verset, application, CTA",
+    description:
+      "Situation du quotidien, le mot du Coran, verset, application, CTA",
     cardSlots: [
       {
         type: "custom-text",
@@ -403,7 +410,8 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
     id: "enigme-detail",
     style: "educatif",
     name: "④ Énigme — Le détail que personne ne remarque",
-    description: "Série qui parle au parent : énigme, verset, révélation, offre, CTA",
+    description:
+      "Série qui parle au parent : énigme, verset, révélation, offre, CTA",
     cardSlots: [
       {
         type: "custom-text",
@@ -643,6 +651,113 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
             { arabic: "", translation: "" },
             { arabic: "", translation: "" },
           ],
+        },
+      },
+    ],
+  },
+
+  // ─── OPINION (Avis communauté) ───
+  {
+    id: "avis-ab",
+    style: "opinion",
+    name: "Avis A ou B",
+    description: "Compare 2 versions, demande l'avis de la communauté",
+    cardSlots: [
+      {
+        type: "opinion-choice",
+        startRatio: 0,
+        endRatio: 1,
+        content: {
+          type: "opinion-choice",
+          mode: "ab",
+          eyebrow: "J'AI BESOIN DE TON AVIS",
+          question: "QUELLE VERSION TU PRÉFÈRES ?",
+          options: [
+            { id: "a", label: "A" },
+            { id: "b", label: "B" },
+          ],
+          cta: "A OU B ? ÉCRIS TA RÉPONSE EN COMMENTAIRE",
+          footerText:
+            "La version gagnante sera utilisée dans le livret Mission Sourates.",
+          revealMode: "sequential",
+        },
+      },
+    ],
+  },
+  {
+    id: "avis-abc",
+    style: "opinion",
+    name: "Avis A, B ou C",
+    description: "Compare 3 versions, la communauté choisit",
+    cardSlots: [
+      {
+        type: "opinion-choice",
+        startRatio: 0,
+        endRatio: 1,
+        content: {
+          type: "opinion-choice",
+          mode: "abc",
+          eyebrow: "J'AI BESOIN DE TON AVIS",
+          question: "QUELLE MISE EN PAGE TU PRÉFÈRES POUR LE LIVRET ?",
+          options: [
+            { id: "a", label: "A" },
+            { id: "b", label: "B" },
+            { id: "c", label: "C" },
+          ],
+          cta: "A, B OU C ? DIS-MOI TON CHOIX EN COMMENTAIRE",
+          footerText:
+            "Ton avis m'aide à créer un livret vraiment agréable pour les enfants.",
+          revealMode: "sequential",
+        },
+      },
+    ],
+  },
+  {
+    id: "avis-avec-sans",
+    style: "opinion",
+    name: "Avec ou sans",
+    description: "Compare deux versions : avec et sans un élément",
+    cardSlots: [
+      {
+        type: "opinion-choice",
+        startRatio: 0,
+        endRatio: 1,
+        content: {
+          type: "opinion-choice",
+          mode: "avec-sans",
+          eyebrow: "J'AI BESOIN DE TON AVIS",
+          question: "TU PRÉFÈRES AVEC OU SANS ?",
+          options: [
+            { id: "avec", label: "AVEC" },
+            { id: "sans", label: "SANS" },
+          ],
+          cta: "TU PRÉFÈRES AVEC OU SANS ?",
+          revealMode: "simultaneous",
+        },
+      },
+    ],
+  },
+  {
+    id: "avis-resultat",
+    style: "opinion",
+    name: "Résultat du vote",
+    description: "Révèle la version gagnante choisie par la communauté",
+    cardSlots: [
+      {
+        type: "opinion-choice",
+        startRatio: 0,
+        endRatio: 1,
+        content: {
+          type: "opinion-choice",
+          mode: "resultat",
+          eyebrow: "VOUS AVEZ CHOISI",
+          question: "VOICI LA VERSION GAGNANTE",
+          options: [
+            { id: "a", label: "A" },
+            { id: "b", label: "B" },
+          ],
+          cta: "MERCI POUR VOS AVIS",
+          revealMode: "simultaneous",
         },
       },
     ],

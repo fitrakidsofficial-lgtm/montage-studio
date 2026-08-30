@@ -1,10 +1,5 @@
 import type { BrandConfig, SingleWordContent } from "@/lib/types";
-import {
-  KidsCard,
-  OrganicHighlight,
-  arabicFontSize,
-  CARD_ROTATIONS,
-} from "./shared";
+import { arabicFontSize } from "./shared";
 
 export function SingleWordCard({
   content,
@@ -14,12 +9,7 @@ export function SingleWordCard({
   brand: BrandConfig;
 }) {
   return (
-    <KidsCard
-      brand={brand}
-      accent="gold"
-      rotation={CARD_ROTATIONS["single-word"] ?? 0}
-      padding="82px 58px 86px"
-    >
+    <>
       <div
         style={{
           display: "inline-block",
@@ -36,33 +26,36 @@ export function SingleWordCard({
         {content.label}
       </div>
       <div style={{ marginTop: 38 }}>
-        <OrganicHighlight brand={brand}>
-          <div
-            dir="rtl"
-            style={{
-              maxWidth: 760,
-              fontFamily: brand.fonts.arabic,
-              fontSize: arabicFontSize(content.arabic),
-              fontWeight: 400,
-              lineHeight: 1.45,
-              color: brand.colors.night,
-            }}
-          >
-            {content.arabic}
-          </div>
-        </OrganicHighlight>
+        <div
+          dir="rtl"
+          style={{
+            maxWidth: 760,
+            fontFamily: brand.fonts.arabic,
+            fontSize: arabicFontSize(content.arabic),
+            fontWeight: 700,
+            lineHeight: 1.45,
+            color: brand.colors.cream,
+            textShadow: "0 0 40px rgba(242,138,75,0.3)",
+          }}
+        >
+          {content.arabic}
+        </div>
       </div>
-      <div
-        style={{
-          fontFamily: brand.fonts.body,
-          color: brand.colors.night,
-          fontSize: 62,
-          lineHeight: 1.18,
-          marginTop: 34,
-        }}
-      >
-        {content.translation}
-      </div>
-    </KidsCard>
+      {content.translation && (
+        <div
+          style={{
+            fontFamily: brand.fonts.body,
+            color: brand.colors.cream,
+            fontSize: 62,
+            lineHeight: 1.18,
+            marginTop: 34,
+            textAlign: "center",
+            textShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          }}
+        >
+          {content.translation}
+        </div>
+      )}
+    </>
   );
 }

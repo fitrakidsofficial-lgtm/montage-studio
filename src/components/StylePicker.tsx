@@ -13,9 +13,10 @@ const STYLE_LABELS: Record<TemplateStyle, string> = {
   educatif: "Educatif",
   promo: "Promo",
   broll: "B-roll",
+  opinion: "Avis communauté",
 };
 
-const STYLE_ORDER: TemplateStyle[] = ["educatif", "promo", "broll"];
+const STYLE_ORDER: TemplateStyle[] = ["educatif", "promo", "broll", "opinion"];
 
 export function StylePicker({ value, selectedPresetId, onSelect }: Props) {
   return (

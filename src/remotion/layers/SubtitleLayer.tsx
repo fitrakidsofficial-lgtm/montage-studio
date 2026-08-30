@@ -11,6 +11,8 @@ interface Props {
   fontSize?: number;
   /** Custom font family override */
   fontFamily?: string;
+  /** Vertical position — distance from bottom in px (default 120) */
+  position?: number;
 }
 
 /** Returns true if the string contains Arabic/Hebrew script characters */
@@ -55,6 +57,7 @@ export function SubtitleLayer({
   currentTime,
   fontSize: fontSizeOverride,
   fontFamily: fontFamilyOverride,
+  position: positionOverride,
 }: Props) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -109,7 +112,7 @@ export function SubtitleLayer({
         position: "absolute",
         left: arabic ? 50 : 30,
         right: arabic ? 50 : 30,
-        bottom: 120,
+        bottom: positionOverride ?? 120,
         overflow: "visible",
         fontFamily:
           fontFamilyOverride ||

@@ -5,20 +5,23 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { BrandConfig, ConceptCard } from "@/lib/types";
+import type { BrandConfig, BrollItem, ConceptCard } from "@/lib/types";
 import { RootLettersCard } from "./cards/RootLettersCard";
 import { SingleWordCard } from "./cards/SingleWordCard";
 import { VerseCard } from "./cards/VerseCard";
 import { FamilyRecapCard } from "./cards/FamilyRecapCard";
 import { PriceTagCard, FeatureListCard, CtaCard } from "./cards/PromoCards";
 import { CustomTextCard } from "./cards/CustomTextCard";
+import { OpinionChoiceCard } from "./cards/OpinionChoiceCard";
 
 interface Props {
   cards: ConceptCard[];
   brand: BrandConfig;
-  style?: "educatif" | "promo" | "broll";
+  style?: "educatif" | "promo" | "broll" | "opinion";
   currentTime?: number;
   words?: { word: string; start: number; end: number }[];
+  brolls?: BrollItem[];
+  offsetY?: number;
 }
 
 function fade(time: number, start: number, end: number, edge = 0.3) {
@@ -47,6 +50,10 @@ const STYLE_BACKGROUNDS = {
     bg: `linear-gradient(180deg, rgba(0,0,0,.7) 0%, rgba(0,0,0,.85) 50%, rgba(0,0,0,.7) 100%)`,
     dots: `radial-gradient(circle, ${brand.colors.teal}15 0 1px, transparent 2px)`,
   }),
+  opinion: () => ({
+    bg: "#061A2A",
+    dots: "none",
+  }),
 };
 
 function ConceptFrame({
@@ -58,7 +65,7 @@ function ConceptFrame({
   children: React.ReactNode;
   opacity: number;
   brand: BrandConfig;
-  style?: "educatif" | "promo" | "broll";
+  style?: "educatif" | "promo" | "broll" | "opinion";
 }) {
   const theme = STYLE_BACKGROUNDS[style](brand);
   return (
@@ -89,6 +96,7 @@ function renderCardContent(
   brand: BrandConfig,
   time: number,
   words?: { word: string; start: number; end: number }[],
+  brolls?: BrollItem[],
 ) {
   const c = card.content;
   switch (c.type) {
@@ -124,6 +132,17 @@ function renderCardContent(
       return <CtaCard content={c} brand={brand} />;
     case "custom-text":
       return <CustomTextCard content={c} brand={brand} />;
+    case "opinion-choice":
+      return (
+        <OpinionChoiceCard
+          content={c}
+          brand={brand}
+          time={time}
+          startTime={card.startTime}
+          endTime={card.endTime}
+          brolls={brolls}
+        />
+      );
   }
 }
 
@@ -133,6 +152,8 @@ export function ConceptCardLayer({
   style = "educatif",
   currentTime,
   words,
+  brolls,
+  offsetY = 0,
 }: Props) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -142,6 +163,16 @@ export function ConceptCardLayer({
   if (!active) return null;
 
   const opacity = fade(time, active.startTime, active.endTime);
+
+  // Opinion-choice cards render full-frame, skip ConceptFrame wrapper
+  if (active.content.type === "opinion-choice") {
+    return (
+      <AbsoluteFill style={{ opacity }}>
+        {renderCardContent(active, brand, time, words, brolls)}
+      </AbsoluteFill>
+    );
+  }
+
   const entry = spring({
     fps,
     frame: Math.max(0, (time - active.startTime) * fps),
@@ -154,11 +185,11 @@ export function ConceptCardLayer({
     <ConceptFrame opacity={opacity} brand={brand} style={style}>
       <div
         style={{
-          transform: `translateY(${entryY}px) scale(${entryScale})`,
+          transform: `translateY(${entryY + offsetY}px) scale(${entryScale})`,
           transformOrigin: "center center",
         }}
       >
-        {renderCardContent(active, brand, time, words)}
+        {renderCardContent(active, brand, time, words, brolls)}
       </div>
     </ConceptFrame>
   );

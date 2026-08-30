@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -7,6 +7,9 @@ import {
   interpolate,
   useCurrentFrame,
   useVideoConfig,
+  delayRender,
+  continueRender,
+  staticFile,
 } from "remotion";
 import type { VideoProject } from "@/lib/types";
 import { SubtitleLayer } from "./layers/SubtitleLayer";
@@ -100,11 +103,45 @@ function SyncedVideo({
   );
 }
 
+export const FONTS_TO_LOAD = [
+  { family: "Itim", local: "fonts/itim-latin.woff2" },
+  { family: "Luckiest Guy", local: "fonts/luckiest-guy-latin.woff2" },
+  { family: "Noto Sans Arabic", local: "fonts/noto-arabic.woff2" },
+];
+
+/** Load all project fonts via FontFace API. Works in both Player and Remotion render. */
+export async function loadProjectFonts() {
+  // Always force-load from local files — no shortcuts
+  await Promise.all(
+    FONTS_TO_LOAD.map(async ({ family, local }) => {
+      try {
+        const face = new FontFace(family, `url(${staticFile(local)})`);
+        const loaded = await face.load();
+        document.fonts.add(loaded);
+      } catch {
+        // Font may already be loaded, continue
+      }
+    }),
+  );
+  // Wait for all fonts to be ready
+  await document.fonts.ready;
+}
+
+function useFontLoader() {
+  const [handle] = useState(() => delayRender("Loading fonts"));
+  useEffect(() => {
+    loadProjectFonts()
+      .then(() => continueRender(handle))
+      .catch(() => continueRender(handle));
+  }, [handle]);
+}
+
 interface Props {
   project: VideoProject;
 }
 
 export function UniversalTemplate({ project }: Props) {
+  useFontLoader();
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const time = frame / fps;
@@ -230,10 +267,17 @@ export function UniversalTemplate({ project }: Props) {
         style={project.style}
         currentTime={sourceTime}
         words={project.words}
+        brolls={project.brolls}
+        offsetY={project.cardOffsetY}
       />
 
       {/* Logo */}
-      <LogoLayer brand={project.brand} />
+      <LogoLayer
+        brand={project.brand}
+        x={project.logoX}
+        y={project.logoY}
+        size={project.logoSize}
+      />
 
       {/* Hook (behind subtitles so text stays visible) */}
       {project.introText && (
@@ -245,6 +289,7 @@ export function UniversalTemplate({ project }: Props) {
             text={project.introText}
             brand={project.brand}
             style={project.hookStyle ?? "overlay"}
+            positionY={project.hookPositionY}
           />
         </Sequence>
       )}
@@ -264,6 +309,8 @@ export function UniversalTemplate({ project }: Props) {
         texteCles={project.texteCles ?? []}
         brand={project.brand}
         currentTime={sourceTime}
+        cards={project.cards}
+        offsetY={project.texteCleOffsetY}
       />
 
       {/* Pattern interrupts (Director) */}
@@ -281,6 +328,7 @@ export function UniversalTemplate({ project }: Props) {
         currentTime={sourceTime}
         fontSize={project.subtitleFontSize || undefined}
         fontFamily={project.subtitleFontFamily || undefined}
+        position={project.subtitlePosition || undefined}
       />
 
       {/* Background music */}

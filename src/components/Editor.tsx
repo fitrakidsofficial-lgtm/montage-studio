@@ -12,7 +12,7 @@ import { Timeline, type SelectedElement } from "./editor/Timeline";
 import { AgentPanel } from "./editor/AgentPanel";
 import { PropertyPanel } from "./editor/PropertyPanel";
 import { ToolbarPanels, type PanelId } from "./editor/ToolbarPanels";
-import type { PlayerHandle } from "./PlayerPreview";
+import type { PlayerHandle, PreviewClickZone } from "./PlayerPreview";
 import { applyEpisode } from "@/lib/mission-sourates-episodes";
 
 const PlayerPreview = lazy(() => import("./PlayerPreview"));
@@ -129,6 +129,18 @@ export function Editor({ initialProject }: Props) {
     },
     [project.fps],
   );
+
+  // ── Click on preview element → open corresponding panel ──
+  const handleZoneClick = useCallback((zone: PreviewClickZone) => {
+    const ZONE_TO_PANEL: Record<NonNullable<PreviewClickZone>, PanelId> = {
+      subtitle: "subtitles",
+      card: "texte",
+      hook: "brand",
+      cta: "brand",
+      broll: "brolls",
+    };
+    if (zone) setActivePanel(ZONE_TO_PANEL[zone]);
+  }, []);
 
   // Keyboard shortcuts (extracted hook with Cmd+D duplicate and S split)
   useKeyboardShortcuts({
@@ -258,65 +270,93 @@ export function Editor({ initialProject }: Props) {
   }, [project.subtitles, project.words, update]);
 
   // ── Export MP4 ──
-  const handleRender = useCallback(async (mode: "full" | "trailer") => {
-    setRendering(true);
-    setRenderUrl(null);
-    setRenderKind(mode);
-    try {
-      const form = new FormData();
-      const projectCopy = { ...project, brolls: [...project.brolls] };
+  const [renderStatus, setRenderStatus] = useState("");
+  const handleRender = useCallback(
+    async (mode: "full" | "trailer") => {
+      // Check video file is available before starting
+      if (project.mainVideoUrl?.startsWith("blob:") && !videoFileRef.current) {
+        alert(
+          "Le fichier vidéo a été perdu. Ré-importe ta vidéo avant de lancer le rendu.",
+        );
+        return;
+      }
+      setRendering(true);
+      setRenderUrl(null);
+      setRenderKind(mode);
+      setRenderStatus("Préparation...");
+      try {
+        const form = new FormData();
+        const projectCopy = { ...project, brolls: [...project.brolls] };
 
-      if (projectCopy.mainVideoUrl?.startsWith("blob:"))
-        projectCopy.mainVideoUrl = "__UPLOAD_MAIN__";
-      if (videoFileRef.current && project.mainVideoUrl?.startsWith("blob:"))
-        form.append("mainVideo", videoFileRef.current);
+        if (projectCopy.mainVideoUrl?.startsWith("blob:"))
+          projectCopy.mainVideoUrl = "__UPLOAD_MAIN__";
+        if (videoFileRef.current && project.mainVideoUrl?.startsWith("blob:"))
+          form.append("mainVideo", videoFileRef.current);
 
-      projectCopy.brolls = projectCopy.brolls.map((b) => {
-        if (b.fileUrl.startsWith("blob:")) {
-          const file = brollFilesRef.current.get(b.id);
-          if (file) {
-            form.append(`broll_${b.id}`, file);
-            return { ...b, fileUrl: `__UPLOAD_BROLL_${b.id}__` };
+        projectCopy.brolls = projectCopy.brolls.map((b) => {
+          if (b.fileUrl.startsWith("blob:")) {
+            const file = brollFilesRef.current.get(b.id);
+            if (file) {
+              form.append(`broll_${b.id}`, file);
+              return { ...b, fileUrl: `__UPLOAD_BROLL_${b.id}__` };
+            }
+          }
+          return b;
+        });
+        projectCopy.brolls = projectCopy.brolls.filter(
+          (b) => !b.fileUrl.startsWith("blob:"),
+        );
+
+        if (projectCopy.bgMusicUrl?.startsWith("blob:")) {
+          if (bgMusicFileRef.current) {
+            form.append("bgMusic", bgMusicFileRef.current);
+            projectCopy.bgMusicUrl = "__UPLOAD_BGMUSIC__";
+          } else {
+            projectCopy.bgMusicUrl = null;
           }
         }
-        return b;
-      });
-      projectCopy.brolls = projectCopy.brolls.filter(
-        (b) => !b.fileUrl.startsWith("blob:"),
-      );
 
-      if (projectCopy.bgMusicUrl?.startsWith("blob:")) {
-        if (bgMusicFileRef.current) {
-          form.append("bgMusic", bgMusicFileRef.current);
-          projectCopy.bgMusicUrl = "__UPLOAD_BGMUSIC__";
+        form.append("project", JSON.stringify(projectCopy));
+        if (mode === "trailer") {
+          form.append(
+            "clipDurationSeconds",
+            String(project.trailerDurationSeconds ?? 30),
+          );
+        }
+        setRenderStatus("Upload vidéo...");
+        const res = await fetch("/api/render", {
+          method: "POST",
+          body: form,
+          signal: AbortSignal.timeout(30 * 60 * 1000),
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          setRenderUrl(data.url);
+          setRenderStatus("");
+          update(
+            mode === "trailer"
+              ? { trailerVideoUrl: data.url }
+              : { fullVideoUrl: data.url },
+          );
         } else {
-          projectCopy.bgMusicUrl = null;
+          setRenderStatus("");
+          alert(data.error || "Erreur de rendu");
+        }
+      } catch (err) {
+        setRenderStatus("");
+        const msg = (err as Error).message;
+        if (msg.includes("abort") || msg.includes("timeout")) {
+          alert(
+            "Le rendu a pris trop de temps (> 30 min). Essaie un extrait plus court.",
+          );
+        } else {
+          alert("Erreur: " + msg);
         }
       }
-
-      form.append("project", JSON.stringify(projectCopy));
-      if (mode === "trailer") {
-        form.append(
-          "clipDurationSeconds",
-          String(project.trailerDurationSeconds ?? 30),
-        );
-      }
-      const res = await fetch("/api/render", { method: "POST", body: form });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        setRenderUrl(data.url);
-        update(
-          mode === "trailer"
-            ? { trailerVideoUrl: data.url }
-            : { fullVideoUrl: data.url },
-        );
-      }
-      else alert(data.error || "Erreur de rendu");
-    } catch (err) {
-      alert("Erreur: " + (err as Error).message);
-    }
-    setRendering(false);
-  }, [project, videoFileRef, bgMusicFileRef, brollFilesRef, update]);
+      setRendering(false);
+    },
+    [project, videoFileRef, bgMusicFileRef, brollFilesRef, update],
+  );
 
   // ── Drag & drop video ──
   const handleDrop = useCallback(
@@ -561,6 +601,7 @@ export function Editor({ initialProject }: Props) {
               totalDuration={totalDuration}
               onTimeUpdate={handleTimeUpdate}
               onPlayingChange={handlePlayingChange}
+              onZoneClick={handleZoneClick}
             />
           </Suspense>
         </div>
@@ -643,7 +684,7 @@ export function Editor({ initialProject }: Props) {
             disabled={rendering}
             className="hidden md:block px-4 py-1.5 bg-white text-zinc-900 hover:bg-zinc-200 disabled:opacity-40 rounded-lg text-xs font-semibold transition-colors"
           >
-            {rendering ? "Rendu..." : "Exporter"}
+            {rendering ? renderStatus || "Rendu en cours..." : "Exporter"}
           </button>
           <button
             onClick={() => void handleRender("trailer")}
@@ -973,6 +1014,7 @@ export function Editor({ initialProject }: Props) {
               totalDuration={totalDuration}
               onTimeUpdate={handleTimeUpdate}
               onPlayingChange={handlePlayingChange}
+              onZoneClick={handleZoneClick}
             />
           </Suspense>
         </div>

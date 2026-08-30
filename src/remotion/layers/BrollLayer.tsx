@@ -156,7 +156,11 @@ export function BrollLayer({
   const { fps } = useVideoConfig();
   const time = currentTime ?? frame / fps;
 
-  const active = brolls.find((b) => time >= b.startTime && time < b.endTime);
+  // Filter out opinion assets — they are rendered by OpinionChoiceCard, not here
+  const timelineBrolls = brolls.filter((b) => b.assetRole !== "opinion");
+  const active = timelineBrolls.find(
+    (b) => time >= b.startTime && time < b.endTime,
+  );
   if (!active) return null;
 
   const opacity = fade(time, active.startTime, active.endTime);

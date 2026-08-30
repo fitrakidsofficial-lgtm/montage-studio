@@ -10,9 +10,10 @@ interface Props {
   text: string;
   brand: BrandConfig;
   style: "overlay" | "card";
+  positionY?: number;
 }
 
-export function HookLayer({ text, brand, style }: Props) {
+export function HookLayer({ text, brand, style, positionY = 180 }: Props) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
@@ -88,7 +89,7 @@ export function HookLayer({ text, brand, style }: Props) {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        paddingTop: 180,
+        paddingTop: positionY,
         opacity,
       }}
     >

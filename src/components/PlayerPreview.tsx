@@ -10,14 +10,26 @@ import {
   useImperativeHandle,
 } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
-import { UniversalTemplate } from "@/remotion/UniversalTemplate";
+import {
+  UniversalTemplate,
+  loadProjectFonts,
+} from "@/remotion/UniversalTemplate";
 import type { VideoProject } from "@/lib/types";
+
+export type PreviewClickZone =
+  | "subtitle"
+  | "card"
+  | "hook"
+  | "cta"
+  | "broll"
+  | null;
 
 interface Props {
   project: VideoProject;
   totalDuration: number;
   onTimeUpdate?: (timeSeconds: number, frame: number) => void;
   onPlayingChange?: (playing: boolean) => void;
+  onZoneClick?: (zone: PreviewClickZone) => void;
 }
 
 export interface PlayerHandle {
@@ -28,13 +40,66 @@ export interface PlayerHandle {
   captureFrame: () => string | null;
 }
 
+/** Detect which visual zone is active at a given time */
+function detectZoneAtTime(
+  project: VideoProject,
+  time: number,
+  totalDuration: number,
+): PreviewClickZone {
+  // Check cards first (most specific)
+  const activeCard = project.cards.find(
+    (c) => time >= c.startTime && time < c.endTime,
+  );
+  if (activeCard) return "card";
+
+  // Check hook (intro)
+  if (project.introText && time < (project.introDuration ?? 3)) return "hook";
+
+  // Check CTA
+  const cuts = project.silenceCuts ?? [];
+  const cutTotal = cuts.reduce((s, c) => s + (c.end - c.start), 0);
+  const contentEnd = project.mainVideoDurationSeconds - cutTotal;
+  if (project.ctaObjective && time >= contentEnd - 3) return "cta";
+
+  // Check B-roll
+  const activeBroll = project.brolls.find(
+    (b) => time >= b.startTime && time < b.endTime,
+  );
+  if (activeBroll) return "broll";
+
+  // Check subtitle
+  const activeSub = project.subtitles.find(
+    (s) => time >= s.start && time < s.end,
+  );
+  if (activeSub) return "subtitle";
+
+  return null;
+}
+
 const PlayerPreview = forwardRef<PlayerHandle, Props>(function PlayerPreview(
-  { project, totalDuration, onTimeUpdate, onPlayingChange },
+  { project, totalDuration, onTimeUpdate, onPlayingChange, onZoneClick },
   ref,
 ) {
   const playerRef = useRef<PlayerRef>(null);
   const playingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [fontsReady, setFontsReady] = useState(false);
+
+  // Load fonts before rendering Player
+  useEffect(() => {
+    loadProjectFonts()
+      .then(() => {
+        console.log(
+          "[Fonts] All loaded. Itim check:",
+          document.fonts.check("16px Itim"),
+        );
+        setFontsReady(true);
+      })
+      .catch((e) => {
+        console.warn("[Fonts] Load error:", e);
+        setFontsReady(true);
+      });
+  }, []);
   const [playerSize, setPlayerSize] = useState({ w: 360, h: 640 });
 
   const durationInFrames = Math.max(
@@ -158,10 +223,39 @@ const PlayerPreview = forwardRef<PlayerHandle, Props>(function PlayerPreview(
     return () => ro.disconnect();
   }, []);
 
+  const handlePreviewClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onZoneClick) return;
+      // Don't intercept clicks on the controls bar (bottom ~40px)
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const clickY = e.clientY - rect.top;
+      if (clickY > rect.height - 40) return;
+
+      const time =
+        (playerRef.current?.getCurrentFrame() ?? 0) / (project.fps || 30);
+      const zone = detectZoneAtTime(project, time, totalDuration);
+      if (zone) {
+        onZoneClick(zone);
+      }
+    },
+    [onZoneClick, project, totalDuration],
+  );
+
+  if (!fontsReady) {
+    return (
+      <div
+        ref={containerRef}
+        className="rounded-2xl overflow-hidden shadow-2xl shadow-black/50 flex items-center justify-center bg-zinc-900"
+        style={{ width: playerSize.w, height: playerSize.h }}
+      />
+    );
+  }
+
   return (
     <div
       ref={containerRef}
       className="rounded-2xl overflow-hidden shadow-2xl shadow-black/50"
+      onClick={handlePreviewClick}
     >
       <Player
         ref={playerRef}

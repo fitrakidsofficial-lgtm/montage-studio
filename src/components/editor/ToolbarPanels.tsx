@@ -740,6 +740,21 @@ function BrandPanel({
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-[10px] text-zinc-600">Position</span>
+          <input
+            type="range"
+            min={40}
+            max={1600}
+            step={10}
+            value={project.hookPositionY ?? 180}
+            onChange={(e) => update({ hookPositionY: Number(e.target.value) })}
+            className="flex-1 accent-zinc-400"
+          />
+          <span className="text-xs text-zinc-400 w-10 text-right">
+            {project.hookPositionY ?? 180}
+          </span>
+        </div>
       </div>
 
       {/* CTA */}
@@ -797,6 +812,33 @@ function BrandPanel({
         </div>
       </div>
 
+      {/* Subtitle position */}
+      <div>
+        <label className="text-xs text-zinc-500 block mb-1.5">
+          Position sous-titres
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-600 w-6">Bas</span>
+          <input
+            type="range"
+            min={40}
+            max={1400}
+            step={10}
+            value={project.subtitlePosition ?? 120}
+            onChange={(e) =>
+              update({ subtitlePosition: Number(e.target.value) })
+            }
+            className="flex-1 accent-zinc-400"
+          />
+          <span className="text-[10px] text-zinc-600 w-6">Haut</span>
+        </div>
+        <div className="flex justify-center mt-1">
+          <span className="text-xs text-zinc-400">
+            {project.subtitlePosition ?? 120}px
+          </span>
+        </div>
+      </div>
+
       {/* Subtitle font */}
       <div>
         <label className="text-xs text-zinc-500 block mb-1.5">
@@ -827,12 +869,202 @@ function BrandPanel({
         </div>
       </div>
 
-      {/* Logo */}
+      {/* Card title font */}
+      <div>
+        <label className="text-xs text-zinc-500 block mb-1.5">
+          Police titres (cards)
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            {
+              label: "Luckiest Guy",
+              value: "'Luckiest Guy', 'Arial Rounded MT Bold', sans-serif",
+            },
+            { label: "Itim", value: "'Itim', sans-serif" },
+            { label: "Impact", value: "Impact, sans-serif" },
+            { label: "Arial", value: "Arial, sans-serif" },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() =>
+                update({
+                  brand: {
+                    ...project.brand,
+                    fonts: { ...project.brand.fonts, title: opt.value },
+                  },
+                })
+              }
+              className={`px-2 py-1 rounded text-[11px] transition-colors ${
+                project.brand.fonts.title === opt.value
+                  ? "bg-zinc-700 text-white"
+                  : "bg-zinc-800/60 text-zinc-500 hover:text-zinc-300"
+              }`}
+              style={{ fontFamily: opt.value }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Card body font */}
+      <div>
+        <label className="text-xs text-zinc-500 block mb-1.5">
+          Police texte (cards)
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { label: "Itim", value: "'Itim', Arial, sans-serif" },
+            { label: "Luckiest Guy", value: "'Luckiest Guy', sans-serif" },
+            { label: "Arial", value: "Arial, sans-serif" },
+            { label: "Georgia", value: "Georgia, serif" },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() =>
+                update({
+                  brand: {
+                    ...project.brand,
+                    fonts: { ...project.brand.fonts, body: opt.value },
+                  },
+                })
+              }
+              className={`px-2 py-1 rounded text-[11px] transition-colors ${
+                project.brand.fonts.body === opt.value
+                  ? "bg-zinc-700 text-white"
+                  : "bg-zinc-800/60 text-zinc-500 hover:text-zinc-300"
+              }`}
+              style={{ fontFamily: opt.value }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Card position */}
+      <div>
+        <label className="text-xs text-zinc-500 block mb-1.5">
+          Position cards (vertical)
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-600 w-6">Haut</span>
+          <input
+            type="range"
+            min={-400}
+            max={400}
+            step={10}
+            value={project.cardOffsetY ?? 0}
+            onChange={(e) => update({ cardOffsetY: Number(e.target.value) })}
+            className="flex-1 accent-zinc-400"
+          />
+          <span className="text-[10px] text-zinc-600 w-6">Bas</span>
+        </div>
+        <div className="flex justify-between mt-1">
+          <button
+            onClick={() => update({ cardOffsetY: 0 })}
+            className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
+          >
+            Centrer
+          </button>
+          <span className="text-xs text-zinc-400">
+            {project.cardOffsetY ?? 0}px
+          </span>
+        </div>
+      </div>
+
+      {/* Texte-cle position */}
+      <div>
+        <label className="text-xs text-zinc-500 block mb-1.5">
+          Position texte-cle
+        </label>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-600 w-6">Haut</span>
+          <input
+            type="range"
+            min={-600}
+            max={600}
+            step={10}
+            value={project.texteCleOffsetY ?? 0}
+            onChange={(e) =>
+              update({ texteCleOffsetY: Number(e.target.value) })
+            }
+            className="flex-1 accent-zinc-400"
+          />
+          <span className="text-[10px] text-zinc-600 w-6">Bas</span>
+        </div>
+        <div className="flex justify-between mt-1">
+          <button
+            onClick={() => update({ texteCleOffsetY: 0 })}
+            className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
+          >
+            Centrer
+          </button>
+          <span className="text-xs text-zinc-400">
+            {project.texteCleOffsetY ?? 0}px
+          </span>
+        </div>
+      </div>
+
+      {/* Logo position */}
       <div>
         <label className="text-xs text-zinc-500 block mb-1.5">Logo</label>
-        <div className="text-xs text-zinc-600">
+        <div className="text-xs text-zinc-600 mb-2">
           {project.brand.logoUrl ? "Logo actif" : "Aucun logo"}
         </div>
+        {project.brand.logoUrl && (
+          <div className="space-y-2">
+            <div>
+              <span className="text-[10px] text-zinc-600">Horizontal</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-zinc-600 w-8">Droite</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={900}
+                  step={10}
+                  value={project.logoX ?? 28}
+                  onChange={(e) => update({ logoX: Number(e.target.value) })}
+                  className="flex-1 accent-zinc-400"
+                />
+                <span className="text-[10px] text-zinc-600 w-8">Gauche</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] text-zinc-600">Vertical</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-zinc-600 w-8">Bas</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1700}
+                  step={10}
+                  value={project.logoY ?? 28}
+                  onChange={(e) => update({ logoY: Number(e.target.value) })}
+                  className="flex-1 accent-zinc-400"
+                />
+                <span className="text-[10px] text-zinc-600 w-8">Haut</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] text-zinc-600">Taille</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={40}
+                  max={500}
+                  step={10}
+                  value={project.logoSize ?? 180}
+                  onChange={(e) => update({ logoSize: Number(e.target.value) })}
+                  className="flex-1 accent-zinc-400"
+                />
+                <span className="text-xs text-zinc-400 w-10 text-right">
+                  {project.logoSize ?? 180}px
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -983,7 +1215,9 @@ function PublishPanel({
   const [instagramConfigured, setInstagramConfigured] = useState(false);
   const [accountSaved, setAccountSaved] = useState(false);
   const [tiktokConfigured, setTikTokConfigured] = useState(false);
-  const [tiktokPrivacyOptions, setTikTokPrivacyOptions] = useState<string[]>([]);
+  const [tiktokPrivacyOptions, setTikTokPrivacyOptions] = useState<string[]>(
+    [],
+  );
   const [tiktokPrivacy, setTikTokPrivacy] = useState("");
   const [tiktokPublishing, setTikTokPublishing] = useState(false);
   const [tiktokResult, setTikTokResult] = useState("");
@@ -1029,18 +1263,20 @@ function PublishPanel({
     ])
       .then(
         ([workspaceResult, instagramResult, tiktokResult, youtubeResult]) => {
-        const dm = workspaceResult.workspace.dmConfig ?? {};
-        setDmKeyword(dm.keyword ?? "");
-        setDmMessage(dm.message ?? "");
-        setDmButtonTitle(dm.buttonTitle ?? "");
-        setDmButtonUrl(dm.buttonUrl ?? "");
-        setInstagramConfigured(instagramResult.configured);
-        setInstagramUserId(instagramResult.userId ?? "");
-        setTikTokConfigured(Boolean(tiktokResult.configured && tiktokResult.valid));
-        const options = tiktokResult.privacyOptions ?? [];
-        setTikTokPrivacyOptions(options);
-        setTikTokPrivacy(options[0] ?? "");
-        setYouTubeConfigured(youtubeResult.configured);
+          const dm = workspaceResult.workspace.dmConfig ?? {};
+          setDmKeyword(dm.keyword ?? "");
+          setDmMessage(dm.message ?? "");
+          setDmButtonTitle(dm.buttonTitle ?? "");
+          setDmButtonUrl(dm.buttonUrl ?? "");
+          setInstagramConfigured(instagramResult.configured);
+          setInstagramUserId(instagramResult.userId ?? "");
+          setTikTokConfigured(
+            Boolean(tiktokResult.configured && tiktokResult.valid),
+          );
+          const options = tiktokResult.privacyOptions ?? [];
+          setTikTokPrivacyOptions(options);
+          setTikTokPrivacy(options[0] ?? "");
+          setYouTubeConfigured(youtubeResult.configured);
         },
       )
       .catch(() => undefined);
@@ -1201,16 +1437,19 @@ function PublishPanel({
       ]
         .filter(Boolean)
         .join("\n");
-      const response = await apiJson<{ message: string }>("/api/publish-tiktok", {
-        method: "POST",
-        body: JSON.stringify({
-          projectId: project.studioProjectId,
-          videoProjectId: project.id,
-          videoUrl: publishMediaUrl,
-          title,
-          privacyLevel: tiktokPrivacy,
-        }),
-      });
+      const response = await apiJson<{ message: string }>(
+        "/api/publish-tiktok",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            projectId: project.studioProjectId,
+            videoProjectId: project.id,
+            videoUrl: publishMediaUrl,
+            title,
+            privacyLevel: tiktokPrivacy,
+          }),
+        },
+      );
       setTikTokResult(response.message);
     } catch (publishError) {
       setTikTokResult(
@@ -1243,7 +1482,9 @@ function PublishPanel({
         </p>
         <div className="mt-3 rounded-lg border border-cyan-900/70 p-2.5">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-bold text-cyan-100">Chaîne YouTube</span>
+            <span className="text-xs font-bold text-cyan-100">
+              Chaîne YouTube
+            </span>
             <span className="text-[10px] text-cyan-400">
               {youtubeConfigured ? "Connectée" : "Non connectée"}
             </span>
@@ -1274,7 +1515,8 @@ function PublishPanel({
               <button
                 onClick={() => void publishYouTube()}
                 disabled={
-                  youtubePublishing || !project.fullVideoUrl?.startsWith("https://")
+                  youtubePublishing ||
+                  !project.fullVideoUrl?.startsWith("https://")
                 }
                 className="w-full rounded-lg bg-red-600 py-2 text-xs font-bold text-white disabled:opacity-40"
               >
@@ -1350,7 +1592,9 @@ function PublishPanel({
 
         <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-300">Compte du projet</span>
+            <span className="text-xs font-bold text-zinc-300">
+              Compte du projet
+            </span>
             <span
               className={`text-[10px] ${
                 instagramConfigured ? "text-emerald-400" : "text-amber-400"
@@ -1369,12 +1613,18 @@ function PublishPanel({
             type="password"
             value={instagramToken}
             onChange={(event) => setInstagramToken(event.target.value)}
-            placeholder={instagramConfigured ? "Nouveau token (pour remplacer)" : "Access token Meta"}
+            placeholder={
+              instagramConfigured
+                ? "Nouveau token (pour remplacer)"
+                : "Access token Meta"
+            }
             className="mb-2 w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-white"
           />
           <button
             onClick={saveInstagramAccount}
-            disabled={!project.studioProjectId || !instagramUserId || !instagramToken}
+            disabled={
+              !project.studioProjectId || !instagramUserId || !instagramToken
+            }
             className="w-full rounded-lg bg-zinc-800 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-700 disabled:opacity-40"
           >
             {accountSaved ? "Compte enregistré" : "Enregistrer pour ce projet"}
@@ -1513,7 +1763,9 @@ function PublishPanel({
           </button>
         ) : (
           <>
-            <label className="mb-1 block text-xs text-zinc-500">Visibilité</label>
+            <label className="mb-1 block text-xs text-zinc-500">
+              Visibilité
+            </label>
             <select
               value={tiktokPrivacy}
               onChange={(event) => setTikTokPrivacy(event.target.value)}

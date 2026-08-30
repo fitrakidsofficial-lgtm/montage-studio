@@ -1,5 +1,4 @@
 import type { BrandConfig, VerseContent } from "@/lib/types";
-import { KidsCard, OrganicHighlight, CARD_ROTATIONS } from "./shared";
 
 export function VerseCard({
   content,
@@ -9,12 +8,7 @@ export function VerseCard({
   brand: BrandConfig;
 }) {
   return (
-    <KidsCard
-      brand={brand}
-      accent="gold"
-      rotation={CARD_ROTATIONS.verse ?? 0}
-      padding="72px 58px 76px"
-    >
+    <>
       <div
         style={{
           fontFamily: brand.fonts.title,
@@ -31,28 +25,28 @@ export function VerseCard({
       >
         {content.surahLabel}
       </div>
-      <OrganicHighlight brand={brand}>
-        <div
-          dir="rtl"
-          style={{
-            maxWidth: 740,
-            fontFamily: brand.fonts.arabic,
-            color: brand.colors.night,
-            fontSize: 72,
-            lineHeight: 1.7,
-          }}
-        >
-          {content.arabic}
-        </div>
-      </OrganicHighlight>
+      <div
+        dir="rtl"
+        style={{
+          maxWidth: 740,
+          fontFamily: brand.fonts.arabic,
+          color: brand.colors.cream,
+          fontSize: 72,
+          lineHeight: 1.7,
+          textAlign: "center",
+        }}
+      >
+        {content.arabic}
+      </div>
       {content.salawat && (
         <div
           dir="rtl"
           style={{
             fontFamily: brand.fonts.arabic,
             fontSize: 55,
-            color: brand.colors.night,
+            color: brand.colors.cream,
             marginTop: 18,
+            textAlign: "center",
           }}
         >
           {content.salawat}
@@ -64,20 +58,22 @@ export function VerseCard({
           height: 7,
           margin: "30px auto 26px",
           borderRadius: 20,
-          background: brand.colors.teal,
-          opacity: 0.4,
+          background: brand.colors.gold,
+          opacity: 0.5,
         }}
       />
       <div
         style={{
           fontFamily: brand.fonts.body,
-          color: brand.colors.night,
+          color: brand.colors.cream,
           fontSize: 40,
           lineHeight: 1.4,
+          textAlign: "center",
+          textShadow: "0 4px 20px rgba(0,0,0,0.4)",
         }}
       >
         {content.translation}
       </div>
-    </KidsCard>
+    </>
   );
 }

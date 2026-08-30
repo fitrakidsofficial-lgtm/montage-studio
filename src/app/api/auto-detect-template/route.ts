@@ -3,7 +3,10 @@ import { getUser } from "@/lib/server/auth";
 
 export async function POST(req: Request) {
   if (!(await getUser())) {
-    return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Authentification requise" },
+      { status: 401 },
+    );
   }
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -43,6 +46,10 @@ Templates disponibles:
 - "enigme-lecon": serie Mission Sourates — situation du quotidien de l'enfant reliee a une sourate — 5 cards
 - "enigme-detail": serie Mission Sourates — le detail qui surprend le parent, verset a l'appui — 5 cards
 - "cta-mission": clip de fin reutilisable (4 briques de la plateforme + mot-cle MISSION) — 2 cards
+- "avis-ab": sondage communaute A ou B — compare 2 versions d'un visuel, demande l'avis — 1 card opinion
+- "avis-abc": sondage communaute A, B ou C — compare 3 versions — 1 card opinion
+- "avis-avec-sans": sondage avec/sans un element visuel — 1 card opinion
+- "avis-resultat": resultat du vote communautaire, revele la version gagnante — 1 card opinion
 
 Criteres:
 - Racines arabes, lettres, famille de mots → racine-arabe ou racine-complete
@@ -57,6 +64,9 @@ Criteres:
 - Situation concrete d'enfant (ecole, jalousie, moquerie) reliee a une sourate → enigme-lecon
 - Detail surprenant adresse au parent, "personne ne remarque" → enigme-detail
 - Video courte uniquement d'appel a l'action vers la plateforme → cta-mission
+- Demande d'avis, sondage, "quelle version", "A ou B", "tu preferes" → avis-ab ou avis-abc
+- Comparaison avec/sans un element visuel → avis-avec-sans
+- Resultat d'un vote, "vous avez choisi", annonce du gagnant → avis-resultat
 
 Reponds UNIQUEMENT avec un JSON:
 {

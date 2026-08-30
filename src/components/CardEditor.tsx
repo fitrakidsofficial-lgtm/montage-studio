@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { ConceptCard, ConceptCardContent } from "@/lib/types";
+import type {
+  ConceptCard,
+  ConceptCardContent,
+  OpinionChoiceContent,
+  OpinionChoiceOption,
+} from "@/lib/types";
 
 interface Props {
   cards: ConceptCard[];
@@ -17,6 +22,7 @@ const CARD_TYPES = [
   { id: "feature-list", label: "Liste features" },
   { id: "cta", label: "Call to action" },
   { id: "custom-text", label: "Texte libre" },
+  { id: "opinion-choice", label: "Avis communauté" },
 ] as const;
 
 function defaultContent(type: ConceptCardContent["type"]): ConceptCardContent {
@@ -48,6 +54,21 @@ function defaultContent(type: ConceptCardContent["type"]): ConceptCardContent {
       return {
         type,
         lines: [{ text: "", fontSize: 72, color: "cream" as const }],
+      };
+    case "opinion-choice":
+      return {
+        type,
+        mode: "ab" as const,
+        eyebrow: "J'AI BESOIN DE TON AVIS",
+        question: "QUELLE VERSION TU PRÉFÈRES ?",
+        options: [
+          { id: "a", label: "A" },
+          { id: "b", label: "B" },
+        ],
+        cta: "A OU B ? ÉCRIS TA RÉPONSE EN COMMENTAIRE",
+        footerText:
+          "La version gagnante sera utilisée dans le livret Mission Sourates.",
+        revealMode: "sequential" as const,
       };
   }
 }
@@ -353,7 +374,10 @@ function CardForm({
                   newLines[i] = {
                     ...line,
                     color: e.target.value as
-                      "cream" | "gold" | "orange" | "teal",
+                      | "cream"
+                      | "gold"
+                      | "orange"
+                      | "teal",
                   };
                   onUpdate({ ...card, content: { ...c, lines: newLines } });
                 }}
@@ -385,7 +409,181 @@ function CardForm({
           </button>
         </>
       )}
+
+      {c.type === "opinion-choice" && (
+        <OpinionChoiceForm card={card} content={c} onUpdate={onUpdate} />
+      )}
     </div>
+  );
+}
+
+function OpinionChoiceForm({
+  card,
+  content,
+  onUpdate,
+}: {
+  card: ConceptCard;
+  content: OpinionChoiceContent;
+  onUpdate: (c: ConceptCard) => void;
+}) {
+  const patch = (fields: Partial<OpinionChoiceContent>) => {
+    onUpdate({
+      ...card,
+      content: { ...content, ...fields } as ConceptCardContent,
+    });
+  };
+
+  const updateOption = (
+    index: number,
+    fields: Partial<OpinionChoiceOption>,
+  ) => {
+    const newOptions = [...content.options];
+    newOptions[index] = { ...newOptions[index], ...fields };
+    patch({ options: newOptions });
+  };
+
+  const handleImageSelect = (index: number) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/webp";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      updateOption(index, { imageUrl: url });
+    };
+    input.click();
+  };
+
+  return (
+    <>
+      <div>
+        <label className="text-xs text-zinc-500">Mode</label>
+        <select
+          value={content.mode}
+          onChange={(e) => {
+            const mode = e.target.value as OpinionChoiceContent["mode"];
+            let options = content.options;
+            if (mode === "abc" && options.length < 3) {
+              options = [...options, { id: "c", label: "C" }];
+            } else if (
+              (mode === "ab" || mode === "avec-sans") &&
+              options.length > 2
+            ) {
+              options = options.slice(0, 2);
+            }
+            if (mode === "avec-sans") {
+              options = options.map((o, i) => ({
+                ...o,
+                label: i === 0 ? "AVEC" : "SANS",
+              }));
+            }
+            patch({ mode, options });
+          }}
+          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
+        >
+          <option value="ab">A ou B</option>
+          <option value="abc">A, B ou C</option>
+          <option value="avec-sans">Avec ou sans</option>
+          <option value="resultat">Résultat du vote</option>
+        </select>
+      </div>
+
+      <input
+        value={content.eyebrow}
+        onChange={(e) => patch({ eyebrow: e.target.value })}
+        placeholder="Accroche (ex: J'AI BESOIN DE TON AVIS)"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
+      />
+
+      <input
+        value={content.question}
+        onChange={(e) => patch({ question: e.target.value })}
+        placeholder="Question principale"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
+      />
+
+      <input
+        value={content.cta}
+        onChange={(e) => patch({ cta: e.target.value })}
+        placeholder="CTA (appel à l'action)"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
+      />
+
+      <input
+        value={content.footerText || ""}
+        onChange={(e) => patch({ footerText: e.target.value })}
+        placeholder="Texte secondaire (optionnel)"
+        className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
+      />
+
+      <div>
+        <label className="text-xs text-zinc-500">Révélation</label>
+        <select
+          value={content.revealMode}
+          onChange={(e) =>
+            patch({
+              revealMode: e.target.value as "simultaneous" | "sequential",
+            })
+          }
+          className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
+        >
+          <option value="sequential">Séquentielle (une par une)</option>
+          <option value="simultaneous">Simultanée (toutes ensemble)</option>
+        </select>
+      </div>
+
+      <div className="space-y-2 pt-2 border-t border-zinc-700">
+        <span className="text-xs font-bold text-zinc-400 uppercase">
+          Options
+        </span>
+        {content.options.map((opt, i) => (
+          <div key={opt.id} className="bg-zinc-900 rounded-lg p-3 space-y-2">
+            <input
+              value={opt.label}
+              onChange={(e) => updateOption(i, { label: e.target.value })}
+              placeholder={`Libellé option ${i + 1}`}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-sm text-white"
+            />
+            <div className="flex items-center gap-2">
+              {opt.imageUrl ? (
+                <>
+                  <img
+                    src={opt.imageUrl}
+                    alt={opt.label}
+                    className="w-16 h-16 object-contain rounded bg-zinc-800"
+                  />
+                  <button
+                    onClick={() => handleImageSelect(i)}
+                    className="text-amber-400 text-xs"
+                  >
+                    Remplacer
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => handleImageSelect(i)}
+                  className="text-amber-400 text-xs bg-zinc-800 px-3 py-1.5 rounded"
+                >
+                  Choisir une image
+                </button>
+              )}
+            </div>
+            {content.mode === "resultat" && (
+              <label className="flex items-center gap-2 text-xs text-zinc-400">
+                <input
+                  type="radio"
+                  name="winner"
+                  checked={content.winnerId === opt.id}
+                  onChange={() => patch({ winnerId: opt.id })}
+                />
+                Version gagnante
+              </label>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 

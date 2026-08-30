@@ -3,9 +3,12 @@ import type { BrandConfig } from "@/lib/types";
 
 interface Props {
   brand: BrandConfig;
+  x?: number;
+  y?: number;
+  size?: number;
 }
 
-export function LogoLayer({ brand }: Props) {
+export function LogoLayer({ brand, x = 28, y = 28, size = 180 }: Props) {
   if (!brand.logoUrl) return null;
 
   return (
@@ -13,11 +16,11 @@ export function LogoLayer({ brand }: Props) {
       src={brand.logoUrl}
       style={{
         position: "absolute",
-        width: 180,
+        width: size,
         height: "auto",
         objectFit: "contain",
-        right: 28,
-        bottom: 28,
+        right: x,
+        bottom: y,
       }}
     />
   );

@@ -82,8 +82,7 @@ export const BRAND_PRESETS = [
   { id: "kids-toybox", name: "Toy Box", brand: MISSION_KIDS_TOYBOX_BRAND },
 ] as const;
 
-
-export type TemplateStyle = "educatif" | "promo" | "broll";
+export type TemplateStyle = "educatif" | "promo" | "broll" | "opinion";
 
 export interface SubtitleWord {
   word: string;
@@ -107,7 +106,8 @@ export interface ConceptCard {
     | "price-tag"
     | "feature-list"
     | "cta"
-    | "custom-text";
+    | "custom-text"
+    | "opinion-choice";
   startTime: number;
   endTime: number;
   content: ConceptCardContent;
@@ -121,7 +121,8 @@ export type ConceptCardContent =
   | PriceTagContent
   | FeatureListContent
   | CtaContent
-  | CustomTextContent;
+  | CustomTextContent
+  | OpinionChoiceContent;
 
 export interface RootLettersContent {
   type: "root-letters";
@@ -179,6 +180,27 @@ export interface CustomTextContent {
   }[];
 }
 
+export type OpinionChoiceMode = "ab" | "abc" | "avec-sans" | "resultat";
+
+export interface OpinionChoiceOption {
+  id: string;
+  label: string;
+  imageUrl?: string;
+  brollId?: string;
+}
+
+export interface OpinionChoiceContent {
+  type: "opinion-choice";
+  mode: OpinionChoiceMode;
+  eyebrow: string;
+  question: string;
+  options: OpinionChoiceOption[];
+  cta: string;
+  footerText?: string;
+  winnerId?: string;
+  revealMode: "simultaneous" | "sequential";
+}
+
 export type BrollLayout =
   | "auto"
   | "fullscreen"
@@ -198,6 +220,8 @@ export interface BrollItem {
   layout?: BrollLayout;
   /** Orientation hint for auto layout */
   orientation?: "portrait" | "landscape";
+  /** Role: "opinion" items are reserved for opinion cards, not shown as B-roll */
+  assetRole?: "timeline" | "opinion";
 }
 
 export interface VideoProject {
@@ -242,11 +266,31 @@ export interface VideoProject {
   /** Subtitle styling */
   subtitleFontSize: number;
   subtitleFontFamily: string;
+  /** Subtitle vertical position — distance from bottom in px (default 120) */
+  subtitlePosition: number;
+  /** Logo position — distance from right edge in px (default 28) */
+  logoX: number;
+  /** Logo position — distance from bottom edge in px (default 28) */
+  logoY: number;
+  /** Hook vertical position — paddingTop in px (default 180) */
+  hookPositionY: number;
+  /** Logo size in px (default 180) */
+  logoSize: number;
+  /** Card vertical offset from center in px (negative = up, positive = down, default 0) */
+  cardOffsetY: number;
+  /** TexteCle vertical offset from center in px (default 0) */
+  texteCleOffsetY: number;
   /** Hook style */
   hookStyle: "overlay" | "card";
   /** CTA objective */
   ctaObjective:
-    "engagement" | "save" | "share" | "subscribe" | "traffic" | "sale" | null;
+    | "engagement"
+    | "save"
+    | "share"
+    | "subscribe"
+    | "traffic"
+    | "sale"
+    | null;
   /** Cross-platform distribution: full video on YouTube, teaser elsewhere. */
   youtubeUrl: string;
   trailerDurationSeconds: number;
@@ -300,6 +344,13 @@ export function createDefaultProject(options?: {
     language: "auto",
     subtitleFontSize: 72,
     subtitleFontFamily: "",
+    subtitlePosition: 120,
+    hookPositionY: 180,
+    logoX: 28,
+    logoY: 28,
+    logoSize: 180,
+    cardOffsetY: 0,
+    texteCleOffsetY: 0,
     hookStyle: "overlay",
     ctaObjective: null,
     youtubeUrl: "",

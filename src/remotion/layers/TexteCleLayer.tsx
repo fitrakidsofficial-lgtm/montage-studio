@@ -4,7 +4,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { BrandConfig } from "@/lib/types";
+import type { BrandConfig, ConceptCard } from "@/lib/types";
 
 interface TexteCle {
   time: number;
@@ -16,9 +16,17 @@ interface Props {
   texteCles: TexteCle[];
   brand: BrandConfig;
   currentTime: number;
+  cards?: ConceptCard[];
+  offsetY?: number;
 }
 
-export function TexteCleLayer({ texteCles, brand, currentTime }: Props) {
+export function TexteCleLayer({
+  texteCles,
+  brand,
+  currentTime,
+  cards,
+  offsetY = 0,
+}: Props) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -28,6 +36,14 @@ export function TexteCleLayer({ texteCles, brand, currentTime }: Props) {
     (t) => currentTime >= t.time && currentTime < t.time + t.duration,
   );
   if (!active) return null;
+
+  // Don't show texte-cle when a concept card is active (avoids overlap)
+  if (
+    cards &&
+    cards.some((c) => currentTime >= c.startTime && currentTime < c.endTime)
+  ) {
+    return null;
+  }
 
   const elapsed = currentTime - active.time;
   const progress = elapsed / active.duration;
@@ -53,7 +69,7 @@ export function TexteCleLayer({ texteCles, brand, currentTime }: Props) {
     >
       <div
         style={{
-          transform: `scale(${scale})`,
+          transform: `scale(${scale}) translateY(${offsetY}px)`,
           opacity,
           fontSize: 72,
           fontFamily: brand.fonts.title,

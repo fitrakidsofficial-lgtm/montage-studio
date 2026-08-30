@@ -3,6 +3,15 @@ import { UniversalTemplate } from "./UniversalTemplate";
 import { PresentationMS, TOTAL_FRAMES } from "./PresentationMS";
 import type { VideoProject } from "@/lib/types";
 import { createDefaultProject } from "@/lib/types";
+import {
+  OpinionEpisode01,
+  OPINION_EPISODE_01_FRAMES,
+} from "./OpinionEpisode01";
+import {
+  OpinionEpisode01Facecam,
+  OPINION_EPISODE_01_FACECAM_FRAMES,
+} from "./OpinionEpisode01Facecam";
+import "./fonts.css";
 
 export const RemotionRoot: React.FC = () => {
   const defaultProject = createDefaultProject();
@@ -41,6 +50,22 @@ export const RemotionRoot: React.FC = () => {
         id="PresentationMS"
         component={PresentationMS}
         durationInFrames={TOTAL_FRAMES}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="AvisCommunaute-Episode01-EtoileOuTerre"
+        component={OpinionEpisode01}
+        durationInFrames={OPINION_EPISODE_01_FRAMES}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="AvisCommunaute-Episode01-Facecam"
+        component={OpinionEpisode01Facecam}
+        durationInFrames={OPINION_EPISODE_01_FACECAM_FRAMES}
         fps={30}
         width={1080}
         height={1920}
