@@ -12,7 +12,7 @@ import { apiError } from "@/lib/server/http";
 
 const execFileAsync = promisify(execFile);
 
-export const maxDuration = 1800;
+export const maxDuration = 300;
 
 const SKIP_URL_RESOLVE = /^\/(?:private|var|tmp|Users|renders)\//;
 
