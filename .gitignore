@@ -48,3 +48,4 @@ test-results/
 # heavy assets
 content/
 public/presentation/
+public/renders/
