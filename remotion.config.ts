@@ -1,5 +1,8 @@
 import { Config } from "@remotion/cli/config";
 import TsconfigPathsPlugin from "tsconfig-paths-webpack-plugin";
+import path from "path";
+
+Config.setPublicDir(path.join(__dirname, "public"));
 
 Config.overrideWebpackConfig((currentConfig) => {
   return {

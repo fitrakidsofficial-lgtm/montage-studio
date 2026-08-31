@@ -5,16 +5,24 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { writeFile, unlink } from "fs/promises";
 import { createReadStream } from "fs";
-import { tmpdir } from "os";
 import { put } from "@vercel/blob";
 import { requireUser } from "@/lib/server/auth";
 import { apiError } from "@/lib/server/http";
 
 const execFileAsync = promisify(execFile);
 
+// Lazy-load Remotion APIs to avoid bundling issues with Next.js
+async function getRemotionApis() {
+  const [{ bundle }, { renderMedia, selectComposition }] = await Promise.all([
+    import("@remotion/bundler"),
+    import("@remotion/renderer"),
+  ]);
+  return { bundle, renderMedia, selectComposition };
+}
+
 export const maxDuration = 300;
 
-const SKIP_URL_RESOLVE = /^\/(?:private|var|tmp|Users|renders)\//;
+const SKIP_URL_RESOLVE = /^\/(?:private|var|tmp|Users)\//;
 
 /**
  * The editor stores public media as Next.js paths such as `/images/foo.png`.
@@ -44,6 +52,7 @@ function resolveProjectMediaUrls(
     !SKIP_URL_RESOLVE.test(value) &&
     /(?:url|src)$/i.test(key)
   ) {
+    // Resolve against the request origin so Remotion's Chrome can fetch them
     return new URL(value, origin).toString();
   }
   return value;
@@ -120,22 +129,23 @@ export async function POST(req: Request) {
       return `/renders/${filename}`;
     }
 
-    // Helper: convert MOV/HEVC to H.264 MP4 via ffmpeg (Chromium can't play HEVC)
-    async function convertToMp4(inputUrlPath: string): Promise<string> {
+    // Re-encode any video to H.264 Baseline for Remotion's bundled Chromium
+    async function ensureChromiumCompatible(
+      inputUrlPath: string,
+    ): Promise<string> {
       const inputAbsPath = join(
         process.cwd(),
         "public",
         inputUrlPath.replace(/^\//, ""),
       );
-      const mp4Filename = inputUrlPath
-        .replace(/\.[^.]+$/, ".mp4")
-        .replace(/^\/renders\//, "");
-      const mp4AbsPath = join(outputDir, mp4Filename);
-      const mp4UrlPath = `/renders/${mp4Filename}`;
+      const safeName = inputUrlPath
+        .replace(/^\//, "")
+        .replace(/[/\\]/g, "-")
+        .replace(/\.[^.]+$/, "-compat.mp4");
+      const mp4AbsPath = join(outputDir, safeName);
+      const mp4UrlPath = `/renders/${safeName}`;
 
-      // Skip if already mp4 with same path
-      if (inputAbsPath === mp4AbsPath) return inputUrlPath;
-
+      console.log(`[render] Re-encoding for Chromium: ${inputUrlPath}`);
       await execFileAsync(
         "ffmpeg",
         [
@@ -143,10 +153,16 @@ export async function POST(req: Request) {
           inputAbsPath,
           "-c:v",
           "libx264",
+          "-profile:v",
+          "main",
+          "-level",
+          "4.0",
           "-preset",
           "fast",
           "-crf",
           "23",
+          "-pix_fmt",
+          "yuv420p",
           "-c:a",
           "aac",
           "-b:a",
@@ -158,6 +174,7 @@ export async function POST(req: Request) {
         ],
         { timeout: 5 * 60 * 1000 },
       );
+      console.log(`[render] Re-encode done: ${mp4UrlPath}`);
 
       tmpFiles.push(mp4AbsPath);
       return mp4UrlPath;
@@ -170,14 +187,7 @@ export async function POST(req: Request) {
         console.log(
           `[render] Saving main video: ${mainVideoFile.name} (${(mainVideoFile.size / 1024 / 1024).toFixed(1)} MB)`,
         );
-        let videoUrl = await saveTmp(mainVideoFile, "main");
-        // Auto-convert non-mp4 videos (MOV, MKV, etc.) to H.264 MP4
-        if (!/\.mp4$/i.test(mainVideoFile.name)) {
-          console.log("[render] Converting to MP4 via ffmpeg...");
-          videoUrl = await convertToMp4(videoUrl);
-          console.log("[render] Conversion done:", videoUrl);
-        }
-        projectJson.mainVideoUrl = videoUrl;
+        projectJson.mainVideoUrl = await saveTmp(mainVideoFile, "main");
       }
     }
     if (
@@ -228,24 +238,44 @@ export async function POST(req: Request) {
     }
 
     const origin = new URL(req.url).origin;
+    console.log("[render] Origin for URL resolution:", origin);
     const renderProject = resolveProjectMediaUrls(projectJson, origin);
-    const props = JSON.stringify({ project: renderProject });
+    const rp = renderProject as Record<string, unknown>;
+    console.log("[render] mainVideoUrl:", rp.mainVideoUrl);
+    console.log(
+      "[render] logoUrl:",
+      (rp.brand as Record<string, unknown>)?.logoUrl ?? rp.logoUrl,
+    );
+    const inputProps = { project: renderProject };
 
-    const renderArgs = [
-      "remotion",
-      "render",
-      "src/remotion/index.ts",
-      "MontageStudio",
-      outputPath,
-      "--props",
-      props,
-      "--codec",
-      "h264",
-      "--image-format",
-      "jpeg",
-      "--quality",
-      "80",
-    ];
+    const publicDir = join(process.cwd(), "public");
+    const entryPoint = join(process.cwd(), "src/remotion/index.ts");
+
+    console.log("[render] Bundling Remotion project...");
+    const { bundle, renderMedia, selectComposition } = await getRemotionApis();
+
+    const bundleLocation = await bundle({
+      entryPoint,
+      publicDir,
+      webpackOverride: (config) => {
+        const TsconfigPathsPlugin = require("tsconfig-paths-webpack-plugin");
+        return {
+          ...config,
+          resolve: {
+            ...config.resolve,
+            plugins: [
+              ...(config.resolve?.plugins ?? []),
+              new TsconfigPathsPlugin({
+                configFile: join(process.cwd(), "tsconfig.json"),
+              }),
+            ],
+          },
+        };
+      },
+    });
+    console.log("[render] Bundle ready:", bundleLocation);
+
+    let frameRange: [number, number] | null = null;
     if (clipDurationSeconds) {
       const fps = Number(projectJson.fps) || 30;
       const availableSeconds =
@@ -254,17 +284,30 @@ export async function POST(req: Request) {
             ? Number(projectJson.outroDurationSeconds) || 0
             : 0) || clipDurationSeconds;
       const trailerSeconds = Math.min(clipDurationSeconds, availableSeconds);
-      renderArgs.push(
-        "--frames",
-        `0-${Math.max(0, Math.ceil(trailerSeconds * fps) - 1)}`,
-      );
+      frameRange = [0, Math.max(0, Math.ceil(trailerSeconds * fps) - 1)];
     }
 
-    console.log("[render] Starting Remotion render...", renderArgs.join(" "));
-    await execFileAsync("npx", renderArgs, {
-      cwd: process.cwd(),
-      timeout: 30 * 60 * 1000,
-      maxBuffer: 50 * 1024 * 1024,
+    const composition = await selectComposition({
+      serveUrl: bundleLocation,
+      id: "MontageStudio",
+      inputProps,
+      timeoutInMilliseconds: 60000,
+    });
+    console.log(
+      `[render] Composition: ${composition.width}x${composition.height}, ${composition.durationInFrames} frames`,
+    );
+
+    await renderMedia({
+      composition,
+      serveUrl: bundleLocation,
+      codec: "h264",
+      outputLocation: outputPath,
+      inputProps,
+      imageFormat: "jpeg",
+      jpegQuality: 80,
+      ...(frameRange ? { frameRange } : {}),
+      timeoutInMilliseconds: 60000,
+      chromiumOptions: { gl: "angle" },
     });
     console.log("[render] Render complete:", outputPath);
 

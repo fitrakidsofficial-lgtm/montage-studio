@@ -30,16 +30,20 @@ export const RemotionRoot: React.FC = () => {
         )}
         calculateMetadata={({ props }) => {
           const project = (props as { project: VideoProject }).project;
+          const fps = Number(project.fps) || 30;
+          const mainDuration = Number(project.mainVideoDurationSeconds) || 10;
           const cutDuration = (project.silenceCuts ?? []).reduce(
             (total, cut) => total + Math.max(0, cut.end - cut.start),
             0,
           );
+          const outroDuration = project.outroVideoUrl
+            ? Number(project.outroDurationSeconds) || 0
+            : 0;
           const seconds =
-            Math.max(0.1, project.mainVideoDurationSeconds - cutDuration) +
-            (project.outroVideoUrl ? project.outroDurationSeconds : 0);
+            Math.max(0.1, mainDuration - cutDuration) + outroDuration;
           return {
-            durationInFrames: Math.max(1, Math.round(seconds * project.fps)),
-            fps: project.fps,
+            durationInFrames: Math.max(1, Math.round(seconds * fps)),
+            fps,
           };
         }}
         fps={defaultProject.fps}

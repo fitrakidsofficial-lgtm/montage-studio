@@ -111,29 +111,30 @@ export const FONTS_TO_LOAD = [
 
 /** Load all project fonts via FontFace API. Works in both Player and Remotion render. */
 export async function loadProjectFonts() {
-  // Always force-load from local files — no shortcuts
+  const timeout = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
   await Promise.all(
     FONTS_TO_LOAD.map(async ({ family, local }) => {
       try {
         const face = new FontFace(family, `url(${staticFile(local)})`);
-        const loaded = await face.load();
-        document.fonts.add(loaded);
+        const loaded = await Promise.race([
+          face.load(),
+          timeout(5000).then(() => null),
+        ]);
+        if (loaded) document.fonts.add(loaded);
       } catch {
         // Font may already be loaded, continue
       }
     }),
   );
-  // Wait for all fonts to be ready
-  await document.fonts.ready;
+  await Promise.race([document.fonts.ready, timeout(3000)]);
 }
 
 function useFontLoader() {
-  const [handle] = useState(() => delayRender("Loading fonts"));
   useEffect(() => {
-    loadProjectFonts()
-      .then(() => continueRender(handle))
-      .catch(() => continueRender(handle));
-  }, [handle]);
+    loadProjectFonts().catch(() => {});
+  }, []);
 }
 
 interface Props {
@@ -210,6 +211,9 @@ export function UniversalTemplate({ project }: Props) {
               src={project.mainVideoUrl}
               volume={mainVolume}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              onError={(e) => {
+                console.error("Video load error:", e);
+              }}
             />
           )
         ) : (

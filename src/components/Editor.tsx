@@ -271,17 +271,17 @@ export function Editor({ initialProject }: Props) {
 
   // ── Export MP4 ──
   const [renderStatus, setRenderStatus] = useState("");
+  const [renderError, setRenderError] = useState("");
   const handleRender = useCallback(
     async (mode: "full" | "trailer") => {
       // Check video file is available before starting
       if (project.mainVideoUrl?.startsWith("blob:") && !videoFileRef.current) {
-        alert(
-          "Le fichier vidéo a été perdu. Ré-importe ta vidéo avant de lancer le rendu.",
-        );
+        setRenderError("Fichier vidéo perdu. Ré-importe ta vidéo.");
         return;
       }
       setRendering(true);
       setRenderUrl(null);
+      setRenderError("");
       setRenderKind(mode);
       setRenderStatus("Préparation...");
       try {
@@ -327,7 +327,6 @@ export function Editor({ initialProject }: Props) {
         const res = await fetch("/api/render", {
           method: "POST",
           body: form,
-          signal: AbortSignal.timeout(30 * 60 * 1000),
         });
         const data = await res.json();
         if (res.ok && data.url) {
@@ -340,18 +339,11 @@ export function Editor({ initialProject }: Props) {
           );
         } else {
           setRenderStatus("");
-          alert(data.error || "Erreur de rendu");
+          setRenderError(data.error || "Erreur de rendu");
         }
       } catch (err) {
         setRenderStatus("");
-        const msg = (err as Error).message;
-        if (msg.includes("abort") || msg.includes("timeout")) {
-          alert(
-            "Le rendu a pris trop de temps (> 30 min). Essaie un extrait plus court.",
-          );
-        } else {
-          alert("Erreur: " + msg);
-        }
+        setRenderError("Erreur: " + (err as Error).message);
       }
       setRendering(false);
     },
@@ -703,6 +695,11 @@ export function Editor({ initialProject }: Props) {
             >
               Telecharger
             </a>
+          )}
+          {renderError && (
+            <span className="text-red-400 text-xs max-w-[200px] truncate" title={renderError}>
+              {renderError}
+            </span>
           )}
         </div>
       </div>
