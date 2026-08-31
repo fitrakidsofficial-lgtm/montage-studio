@@ -81,6 +81,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Pas de projet" }, { status: 400 });
   }
 
+  // Remotion render requires headless Chrome + writable filesystem + ffmpeg
+  // which are NOT available on Vercel serverless. Only works locally.
+  if (process.env.VERCEL) {
+    return NextResponse.json(
+      {
+        error:
+          "Le rendu vidéo n'est pas disponible en production. Lance le rendu en local (npm run dev).",
+      },
+      { status: 501 },
+    );
+  }
+
   const outputDir = join(process.cwd(), "public", "renders");
   const outputFile = `montage-${Date.now()}.mp4`;
   const outputPath = join(outputDir, outputFile);
