@@ -50,10 +50,14 @@ function resolveProjectMediaUrls(
 }
 
 export async function POST(req: Request) {
-  try {
-    await requireUser();
-  } catch (error) {
-    return apiError(error);
+  if (!process.env.VERCEL) {
+    // Local: skip auth for dev convenience
+  } else {
+    try {
+      await requireUser();
+    } catch (error) {
+      return apiError(error);
+    }
   }
   // Detect content type to parse correctly (FormData or JSON, never both)
   const contentType = req.headers.get("content-type") ?? "";
