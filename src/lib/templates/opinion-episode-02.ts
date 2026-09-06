@@ -11,7 +11,7 @@ export function createOpinionEpisode02Project(
   return {
     id: OPINION_EPISODE_02_PROJECT_ID,
     studioProjectId,
-    name: "Avis communauté 02 — Position des textes",
+    name: "Avis communauté 02 — Disposition des versets",
     style: "opinion",
     brand: {
       colors: {
@@ -28,84 +28,103 @@ export function createOpinionEpisode02Project(
       },
       logoUrl: "/fitra-kids-logo.png",
     },
-    mainVideoUrl: null,
-    mainVideoDurationSeconds: 30,
+    mainVideoUrl: `${ASSET_ROOT}/facecam-avis-02-disposition-versets.mp4`,
+    mainVideoDurationSeconds: 48.8,
     fps: 30,
-    subtitles: [],
+    subtitles: [
+      {
+        start: 0,
+        end: 2.42,
+        text: "Ne scrollez surtout pas, on continue",
+      },
+      {
+        start: 2.42,
+        end: 4.16,
+        text: "de construire ensemble le livret Mission Sourates.",
+      },
+      {
+        start: 4.56,
+        end: 8.96,
+        text: "Aujourd’hui, j’ai besoin de votre avis par rapport à la fiche sourate.",
+      },
+      {
+        start: 9.14,
+        end: 12.1,
+        text: "Je vous montre le même contenu, présenté de trois façons différentes.",
+      },
+      {
+        start: 12.82,
+        end: 15.12,
+        text: "Version A : chaque verset se lit de haut en bas :",
+      },
+      {
+        start: 15.24,
+        end: 17.84,
+        text: "l’arabe, la traduction française et la petite explication.",
+      },
+      {
+        start: 18.68,
+        end: 23.94,
+        text: "Version B : les versets sont répartis sur deux colonnes pour en voir plusieurs en même temps.",
+      },
+      {
+        start: 24.54,
+        end: 29.82,
+        text: "Version C : l’explication à gauche, la traduction au milieu et le verset en arabe à droite.",
+      },
+      {
+        start: 30.08,
+        end: 34.44,
+        text: "Laquelle aide le mieux votre enfant à lire, à comprendre et à se repérer dans la page ?",
+      },
+      {
+        start: 34.9,
+        end: 37.1,
+        text: "Montrez-lui les trois versions sans l’influencer.",
+      },
+      {
+        start: 37.66,
+        end: 39.78,
+        text: "Écrivez-moi A, B ou C en commentaire.",
+      },
+      {
+        start: 40.02,
+        end: 43.94,
+        text: "Et pour découvrir Mission Sourates dès maintenant,",
+      },
+      {
+        start: 43.94,
+        end: 47.22,
+        text: "la plateforme vous attend avec huit sourates déjà prêtes et complètes.",
+      },
+      { start: 47.34, end: 48.04, text: "Le lien est dans ma bio." },
+    ],
     words: [],
     cards: [
       {
-        id: "avis-02-rituel-identite",
-        type: "custom-text",
-        startTime: 0,
-        endTime: 1.2,
-        content: {
-          type: "custom-text",
-          lines: [
-            {
-              text: "MISSION SOURATES · AVIS 02",
-              fontSize: 58,
-              color: "gold",
-            },
-          ],
-        },
-      },
-      {
-        id: "avis-02-rituel-promesse",
-        type: "custom-text",
-        startTime: 1.2,
-        endTime: 2.6,
-        content: {
-          type: "custom-text",
-          lines: [
-            {
-              text: "VOTRE AVIS CONSTRUIT LE LIVRET",
-              fontSize: 68,
-              color: "cream",
-            },
-          ],
-        },
-      },
-      {
-        id: "avis-02-rituel-question",
-        type: "custom-text",
-        startTime: 2.6,
-        endTime: 5,
-        content: {
-          type: "custom-text",
-          lines: [
-            {
-              text: "OÙ PLACER LE VERSET, LA TRADUCTION ET L’EXPLICATION ?",
-              fontSize: 62,
-              color: "orange",
-            },
-          ],
-        },
-      },
-      {
         id: "avis-02-vote-abc",
         type: "opinion-choice",
-        startTime: 20,
-        endTime: 30,
+        startTime: 30.08,
+        endTime: 40.02,
         content: {
           type: "opinion-choice",
           mode: "abc",
           eyebrow: "MISSION SOURATES · AVIS 02",
-          question: "Quelle page est la plus facile à lire pour votre enfant ?",
+          question: "Quelle page aide le mieux votre enfant ?",
           options: [
             {
               id: "a",
-              label: "A · LECTURE GUIDÉE",
+              label: "A · DE HAUT EN BAS",
               imageUrl: `${ASSET_ROOT}/page-complete-a-lecture-continue.png`,
             },
             {
               id: "b",
-              label: "B · DEUX ZONES",
+              label: "B · DEUX COLONNES",
               imageUrl: `${ASSET_ROOT}/page-complete-b-deux-colonnes.png`,
             },
             {
               id: "c",
-              label: "C · TROIS ÉTAPES",
+              label: "C · TROIS ZONES ALIGNÉES",
               imageUrl: `${ASSET_ROOT}/page-complete-c-trois-zones.png`,
             },
           ],
@@ -114,12 +133,39 @@ export function createOpinionEpisode02Project(
           revealMode: "sequential",
         },
       },
+      {
+        id: "avis-02-cta-plateforme",
+        type: "custom-text",
+        startTime: 40.02,
+        endTime: 48.8,
+        content: {
+          type: "custom-text",
+          lines: [
+            { text: "8 SOURATES COMPLÈTES", fontSize: 86, color: "cream" },
+            {
+              text: "DÉJÀ PRÊTES SUR LA PLATEFORME",
+              fontSize: 46,
+              color: "gold",
+            },
+            { text: "VOIR LA PLATEFORME · LIEN EN BIO", fontSize: 42, color: "orange" },
+          ],
+        },
+      },
     ],
     brolls: [
       {
+        id: "avis-02-apercu-complet",
+        startTime: 9.14,
+        endTime: 12.1,
+        fileUrl: `${ASSET_ROOT}/comparatif-pages-completes-a-b-c.png`,
+        mediaType: "image",
+        layout: "centered-card",
+        orientation: "landscape",
+      },
+      {
         id: "avis-02-planche-a",
-        startTime: 5,
-        endTime: 10,
+        startTime: 12.82,
+        endTime: 18.68,
         fileUrl: `${ASSET_ROOT}/page-complete-a-video.png`,
         mediaType: "image",
         layout: "fullscreen",
@@ -127,8 +173,8 @@ export function createOpinionEpisode02Project(
       },
       {
         id: "avis-02-planche-b",
-        startTime: 10,
-        endTime: 15,
+        startTime: 18.68,
+        endTime: 24.54,
         fileUrl: `${ASSET_ROOT}/page-complete-b-video.png`,
         mediaType: "image",
         layout: "fullscreen",
@@ -136,8 +182,8 @@ export function createOpinionEpisode02Project(
       },
       {
         id: "avis-02-planche-c",
-        startTime: 15,
-        endTime: 20,
+        startTime: 24.54,
+        endTime: 30.08,
         fileUrl: `${ASSET_ROOT}/page-complete-c-video.png`,
         mediaType: "image",
         layout: "fullscreen",
@@ -148,32 +194,35 @@ export function createOpinionEpisode02Project(
     outroDurationSeconds: 0,
     zooms: [],
     silenceCuts: [],
-    texteCles: [],
+    texteCles: [
+      { time: 0.15, duration: 2.8, text: "MISSION SOURATES · AVIS 02" },
+      { time: 9.14, duration: 2.4, text: "3 FAÇONS DE LIRE" },
+    ],
     patternInterrupts: [],
     introText: null,
-    introDuration: 0,
+    introDuration: 3,
     captions: {
       youtube: {
-        title: "Où placer le verset, la traduction et l’explication ?",
+        title: "Votre enfant lit mieux quelle version : A, B ou C ?",
         description:
-          "Aidez-nous à choisir la mise en page du livret Mission Sourates avec votre enfant : A, B ou C ?",
+          "Aidez-nous à choisir la disposition des versets du livret Mission Sourates. Montrez les trois pages à votre enfant et notez A, B ou C en commentaire.",
         hashtags: ["MissionSourates", "FitraKids", "AlFatiha"],
       },
       instagram: {
         caption:
-          "Nouvelle décision à prendre ensemble : quelle organisation aide le mieux votre enfant à lire et comprendre ? Montrez-lui A, B et C, puis écrivez son choix en commentaire.",
+          "Même contenu, trois façons de le lire. Laquelle aide le mieux votre enfant à lire, comprendre et se repérer : A, B ou C ? Demandez-lui sans l’influencer et écrivez son choix en commentaire. La plateforme Mission Sourates propose déjà 8 sourates complètes — lien en bio.",
         hashtags: ["MissionSourates", "FitraKids", "AlFatiha"],
       },
       tiktok: {
         caption:
-          "Votre enfant préfère A, B ou C ? #MissionSourates #FitraKids #AlFatiha",
+          "A, B ou C : quelle page aide le mieux votre enfant ? 8 sourates complètes sont déjà disponibles. #MissionSourates #FitraKids #AlFatiha",
         hashtags: ["MissionSourates", "FitraKids", "AlFatiha"],
       },
     },
     bgMusicUrl: null,
     bgMusicVolume: 0,
     language: "fr",
-    subtitleFontSize: 44,
+    subtitleFontSize: 42,
     subtitleFontFamily: "'Poppins', Arial, sans-serif",
     subtitlePosition: 120,
     hookPositionY: 180,
@@ -185,8 +234,8 @@ export function createOpinionEpisode02Project(
     hookStyle: "overlay",
     ctaObjective: null,
     youtubeUrl: "",
-    trailerDurationSeconds: 30,
-    trailerCta: "Votez A, B ou C en commentaire.",
+    trailerDurationSeconds: 48.8,
+    trailerCta: "Votez A, B ou C puis découvrez les 8 sourates sur la plateforme.",
     fullVideoUrl: "",
     trailerVideoUrl: "",
   };
